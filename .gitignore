@@ -12,5 +12,5 @@
 *.synctex.gz
 *.lot
 !./example.pdf
-
+*.pdf
 .DS_Store

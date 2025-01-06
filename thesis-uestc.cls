@@ -759,21 +759,19 @@ UDC\textsuperscript{ 注1} \rule[-3pt]{2.5in}{0.5pt} \\[12bp]
 \end{minipage}
 \par{\vspace{3.2cm}}
 \noindent
-\begin{tabular}{>{\fontsize{16pt}{16pt}\selectfont}r
+\begin{tabular}{>{\bfseries\fontsize{16pt}{16pt}\selectfont}l
   >{\centering\arraybackslash\bfseries\fontsize{16pt}{16pt}\selectfont}
   p{10.6cm}}
-  Discipline: & \multirow[t]{2}{*}{\en@themajor} \\
-\cline{2-2}
-& \\
-\cline{2-2}
-Author: & \en@theauthor \\
-\cline{2-2}
-Student ID: & \thestudentnumber \\
-\cline{2-2}
-Supervisor: & \en@theadvisor \\
-\cline{2-2}
-School: & \en@theschool \\
-\cline{2-2}
+  Discipline: & \en@themajor \\
+  \cline{2-2}
+  Author: & \en@theauthor \\
+  \cline{2-2}
+  Student ID: & \thestudentnumber \\
+  \cline{2-2}
+  Supervisor: & \en@theadvisor \\
+  \cline{2-2}
+  School: & \multicolumn{1}{l}{\bfseries\fontsize{16pt}{16pt}\selectfont\en@theschool} \\
+  \cline{2-2}
 \end{tabular}
 }
 

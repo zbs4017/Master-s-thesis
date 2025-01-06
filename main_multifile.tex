@@ -1,17 +1,44 @@
 
-\documentclass[master]{thesis-uestc}
+\documentclass[promaster]{thesis-uestc}
 
-\title{时域积分方程时间步进算法及其快速算法}{The Time Marching Scheme of Time Domain
-    Integral Equation and Corresponding Fast Algorithm}
+\title{面向容器环境异构后端的最小工作集优化研究}{Working Set Optimization Research for Heterogeneous Backend Systems in Containerized Environments}
 
-\author{王稳}{Wang Wen}
-\advisor{赖生建\chinesespace 副教授}{Dr. Shengjian Lai}
-\school{物理电子学院}{School of Physical Electronics}
-\major{无线电物理}{Radio Physics}
-\studentnumber{201421040223}
+\author{张兵帅}{Zhang Bingshuai}
+\advisor{段翰聪\chinesespace 研究员}{Prof. Duan Hancong}
+\school{计算机科学与工程学院}{School of Computer Science and Engineering}
+\major{计算机技术}{Computer Technology}
+\studentnumber{202222080514}
 
 % require all the usepackages here
 % \usepackage{algorithm2e}
+
+%这个的作用是，如果是打印模式，需要注释下面的东西，打印空白页面，如果是电子版，取消注释
+
+% \usepackage{xpatch}
+% \xpatchcmd{\endchineseabstract}{
+% \checkoddpage
+% \ifoddpage
+%     \blankpage
+% \else
+%     \newpage
+% \fi
+% }{}{}{\fail}
+% \xpatchcmd{\endenglishabstract}{
+% \checkoddpage
+% \ifoddpage
+%     \blankpage
+% \else
+%     \newpage
+% \fi
+% }{}{}{\fail}
+% \xpatchcmd{\thesischapterexordium}{
+% \checkoddpage
+% \ifoddpage
+%     \blankpage
+% \else
+%     \newpage
+% \fi
+% }{}{}{}
 
 \begin{document}
 
@@ -37,11 +64,10 @@
 
 % misc
 \input{misc/acknowledgement}
-\input{misc/appendix}
+% \input{misc/appendix}
 
 % Uncomment to list all the entries of the database.
-% \nocite{*}
-
+\nocite{*}
 \thesisbibliography{reference}
 
 %
@@ -54,7 +80,7 @@
 %
 
 \thesisaccomplish{publications}
-\input{misc/translate_original}
-\input{misc/translate_chinese}
+% \input{misc/translate_original}
+% \input{misc/translate_chinese}
 
 \end{document}

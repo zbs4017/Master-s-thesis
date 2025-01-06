@@ -1,5 +1,6 @@
-
 \documentclass[master]{thesis-uestc}
+% 或
+% \documentclass[master,print]{thesis-uestc}
 
 \title{面向容器环境异构后端的最小工作集优化研究}{Working Set Optimization Research for Heterogeneous Backend Systems in Containerized Environments}
 
@@ -8,6 +9,36 @@
 \school{计算机科学与工程学院}{School of Computer Science and Engineering}
 \major{无线电物理}{Radio Physics}
 \studentnumber{201421040223}
+
+\ifprint\else
+  \usepackage{xpatch}
+  \xpatchcmd{\endchineseabstract}{
+    \checkoddpage
+    \ifoddpage
+        \blankpage
+      \else
+        \newpage
+      \fi
+  }{}{}{\fail}
+  
+  \xpatchcmd{\endenglishabstract}{
+    \checkoddpage
+    \ifoddpage
+        \blankpage
+      \else
+        \newpage
+      \fi
+  }{}{}{\fail}
+  
+  \xpatchcmd{\thesischapterexordium}{
+    \checkoddpage
+    \ifoddpage
+        \blankpage
+      \else
+        \newpage
+      \fi
+  }{}{}{\fail}
+\fi
 
 \begin{document}
 
@@ -108,7 +139,7 @@ f(\bm{x}^{i};\bm{w})\cdot f(\bm{x}^{j};\bm{w}),\text{otherwise},
 \label{fig1}
 \end{figure}
 
-时域阻抗元素的存储技术\citing{xiao2012yi}也是时间步进算法并行化的关键技术之一，采用合适的阻抗元素存储方式可以很大的提高并行时间步进算法的计算效率。
+% 时域阻抗元素的存储技术\citing{xiao2012yi}也是时间步进算法并行化的关键技术之一，采用合适的阻抗元素存储方式可以很大的提高并行时间步进算法的计算效率。
 
 \section{本章小结}
 本章首先从时域麦克斯韦方程组出发推导得到了时域电场、磁场以及混合场积分方程。

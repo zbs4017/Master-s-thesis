@@ -1,8 +1,23 @@
-
 \begin{englishabstract}
-With the widespread engineering applications ranging from broadband signals and non-linear systems, time-domain integral equations (TDIE) methods for analyzing transient electromagnetic scattering problems are becoming widely used nowadays. TDIE-based marching-on-in-time (MOT) scheme and its fast algorithm are researched in this dissertation, including the numerical techniques of MOT scheme, late-time stability of MOT scheme, and two-level PWTD-enhanced MOT scheme. The contents are divided into four parts shown as follows.
-	
-\englishkeyword{Time-domain Electromagnetic Scattering, Time-domain Integral Equation, Marching-on In-time (MOT) Scheme, Late-time Instability, Plane Wave Time-domain (PWTD) Algorithm}
+
+The escalating growth of data and the increasing complexity of computational demands in modern applications have accentuated the critical role of memory resources in data centers. While containerization has emerged as the dominant paradigm for application deployment, the virtualization overhead it introduces exacerbates memory requirements, making the already expensive memory resources even more constrained. Despite the increase in single-machine memory capacity, memory cost remains a major component of the total cost of ownership (TCO) in large-scale container clusters. Therefore, there is an urgent need to optimize memory utilization in container environments and explore more cost-effective solutions.
+
+Tiered memory architectures, which migrate cold data to lower-cost storage media, offer a promising approach to efficient memory utilization. However, the proliferation of diverse backend storage solutions, including NVMe SSDs, NVM, RDMA-based memory pools, and compressed memory, each exhibiting distinct latency and bandwidth characteristics, poses significant challenges. Traditional working set estimation algorithms designed for a specific backend are often not directly applicable to others, while developing customized algorithms for each backend lacks scalability and cannot readily adapt to emerging technologies like CXL memory pools.
+
+To address the challenges of efficient memory management in heterogeneous storage environments, this dissertation proposes an adaptive working set calculation method based on kernel-user space collaboration. This method monitors and quantifies memory pressure in the kernel space and feeds this information back to the user space, guiding user-level programs to dynamically adjust their working set sizes. The adjusted working set sizes are then enforced using the cgroup mechanism. Combined with an improved hot/cold page identification algorithm, the kernel can migrate cold pages to lower-cost storage, thereby optimizing memory utilization and achieving adaptive memory management for different storage backends.
+
+The main contributions and innovations of this dissertation are as follows:
+
+1. A Novel Latency-Based Memory Pressure Awareness Architecture: This architecture characterizes memory pressure by the latency induced by memory reclamation, quantifying it by monitoring the CPU time consumed during the process. It enables differentiated memory pressure assessment based on the performance characteristics of different storage backends and exposes this information to user-level applications, enabling adaptive memory management strategies.
+
+2. A Memory Pressure-Based Minimum Working Set Identification Algorithm: This algorithm dynamically calculates the minimum working set size of containers based on real-time memory pressure monitoring and utilizes the cgroup mechanism to limit container memory usage, triggering memory reclamation and thereby achieving effective memory resource savings.
+
+3. An Access-Distance-Based Hot Page Identification Method for File Pages: Existing page hot/cold identification algorithms tend to reclaim file pages, which is detrimental to file-intensive applications such as databases and storage systems. This method, based on page access distance, can more accurately identify hot file pages, thus improving the performance of file-intensive applications.
+
+Experimental results demonstrate that the proposed system can accurately identify the working set of containers across various heterogeneous storage backends, effectively reducing container memory usage (5\%-14\%) and mitigating virtualization overhead.
+
+\englishkeyword{Tiered Memory, Working Set, Memory Management, Hot/Cold Page Identification}
+
 \end{englishabstract}
 
 
