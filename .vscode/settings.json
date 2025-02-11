@@ -1,0 +1,37 @@
+{
+    // ① 定义工具链
+    "latex-workshop.latex.tools": [
+        {
+            "name": "xelatex", // xelatex 命令
+            "command": "xelatex",
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "%DOC%"
+            ]
+        },
+        {
+            "name": "bibtex", // bibtex 命令
+            "command": "bibtex",
+            "args": [
+                "%DOCFILE%"
+            ]
+        }
+        // 如果使用 biber，就改成一个 biber 工具，command 写 biber 即可
+    ],
+    // ② 定义编译方案（Recipe）
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "xe->bib->xe->xe", // 你喜欢的名字
+            "tools": [
+                "xelatex",
+                "bibtex",
+                "xelatex",
+                "xelatex"
+            ]
+        }
+    ],
+    // ③ 让插件默认使用这一个编译方案
+    "latex-workshop.latex.recipeDefault": "xe->bib->xe->xe"
+}
