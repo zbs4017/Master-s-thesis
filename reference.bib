@@ -8,6 +8,22 @@
   pages   = {68 -- 71},
   year    = {1999}
 }
+@inproceedings{10.1145/3620666.3651323,
+author = {Gao, Ruihao and Li, Zhichun and Tan, Guangming and Li, Xueqi},
+title = {BeeZip: Towards An Organized and Scalable Architecture for Data Compression},
+year = {2024},
+isbn = {9798400703867},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3620666.3651323},
+doi = {10.1145/3620666.3651323},
+abstract = {Data compression plays a critical role in operating systems and large-scale computing workloads. Its primary objective is to reduce network bandwidth consumption and memory/storage capacity utilization. Given the need to manipulate hash tables, and execute matching operations on extensive data volumes, data compression software has transformed into a resource-intensive CPU task. To tackle this challenge, numerous prior studies have introduced hardware acceleration methods. For example, they have utilized Content-Addressable Memory (CAM) for string matches, incorporated redundant historical copies for each matching component, and so on. While these methods amplify the compression throughput, they often compromise an essential aspect of compression performance: the compression ratio (C.R.). Moreover, hardware accelerators face significant resource costs, especially in memory, when dealing with new large sliding window algorithms.We introduce BeeZip, the first hardware acceleration system designed explicitly for compression with a large sliding window. BeeZip tackles the hardware-level challenge of optimizing both compression ratio and throughput. BeeZip offers architectural support for compression algorithms with the following distinctive attributes: 1) A two-stage compression algorithm adapted for accelerator parallelism, decoupling hash parallelism and match execution dependencies; 2) An organized hash hardware accelerator named BeeHash engine enhanced with dynamic scheduling, which orchestrates hash processes with structured parallelism; 3) A hardware accelerator named HiveMatch engine for the match process, which employs a new scalable parallelism approach and a heterogeneous scale processing unit design to reduce memory resource overhead.Experimental results show that on the Silesia dataset, BeeZip achieves an optimal throughput of 10.42GB/s (C.R. 2.96) and the best C.R. of 3.14 (throughput of 5.95GB/s). Under similar compression ratios, compared to single-threaded/36-threaded software implementations, BeeZip offers accelerator speedups of 23.2\texttimes{}/2.45\texttimes{}, respectively. Against all accelerators we know, BeeZip consistently demonstrates a superior compression ratio, improving by at least 9\%.},
+booktitle = {Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 3},
+pages = {133–148},
+numpages = {16},
+location = {La Jolla, CA, USA},
+series = {ASPLOS '24}
+}
 @inproceedings{patel2023xfm,
   author     = {Patel, Neel and Mamandipoor, Amin and Quinn, Derrick and Alian, Mohammad},
   title      = {XFM: Accelerated Software-Defined Far Memory},
@@ -23,6 +39,19 @@
   isbn       = {979-8-4007-0329-4},
   language   = {en}
 }
+
+@inproceedings{9860164,
+  author    = {Lian, Zhilu and Li, Yangzi and Chen, Zhixiang and Shan, Shiwen and Han, Baoxin and Su, Yuxin},
+  booktitle = {2022 International Conference on Service Science (ICSS)},
+  title     = {eBPF-based Working Set Size Estimation in Memory Management},
+  year      = {2022},
+  volume    = {},
+  number    = {},
+  pages     = {188-195},
+  keywords  = {Memory management;Estimation;Predictive models;Information filters;Virtual machining;Data models;Resource management;eBPF;Working Set Size Estimation;LightGBM},
+  doi       = {10.1109/ICSS55994.2022.00036}
+}
+
 @article{mutlu2013memory,
   author     = {Mutlu, Onur},
   title      = {Memory Scaling: A Systems Architecture Perspective},
@@ -306,6 +335,44 @@
   series    = {ASPLOS '19}
 }
 
+
+@article{9076292,
+  author   = {Xie, Yulai and Jin, Minpeng and Zou, Zhuping and Xu, Gongming and Feng, Dan and Liu, Wenmao and Long, Darrell},
+  journal  = {IEEE Transactions on Cloud Computing},
+  title    = {Real-Time Prediction of Docker Container Resource Load Based on a Hybrid Model of ARIMA and Triple Exponential Smoothing},
+  year     = {2022},
+  volume   = {10},
+  number   = {2},
+  pages    = {1386-1401},
+  keywords = {Containers;Predictive models;Load modeling;Smoothing methods;Cloud computing;Time series analysis;Computational modeling;Docker container;prediction;hybrid model},
+  doi      = {10.1109/TCC.2020.2989631}
+}
+@article{9870561,
+  author   = {Ding, Zhijun and Feng, Binbin and Jiang, Changjun},
+  journal  = {IEEE Transactions on Parallel and Distributed Systems},
+  title    = {COIN: A Container Workload Prediction Model Focusing on Common and Individual Changes in Workloads},
+  year     = {2022},
+  volume   = {33},
+  number   = {12},
+  pages    = {4738-4751},
+  keywords = {Containers;Predictive models;Data models;Adaptation models;Forecasting;Cloud computing;Load modeling;Cloud Computing;container;workload prediction;container similarity;online learning;transfer learning;integrated model},
+  doi      = {10.1109/TPDS.2022.3202833}
+}
+@article{10.1155/2023/5959223,
+  author     = {Wang, Lu and Guo, Shuaidong and Zhang, Pengli and Yue, Haodong and Li, Yaxiao and Wang, Chenyi and Cao, Zhuang and Cui, Di and Khosravi, Mohammad R.},
+  title      = {An Efficient Load Prediction-Driven Scheduling Strategy Model in Container Cloud},
+  year       = {2023},
+  issue_date = {2023},
+  publisher  = {John Wiley and Sons Ltd.},
+  address    = {GBR},
+  volume     = {2023},
+  issn       = {0884-8173},
+  url        = {https://doi.org/10.1155/2023/5959223},
+  doi        = {10.1155/2023/5959223},
+  journal    = {Int. J. Intell. Syst.},
+  month      = jan,
+  numpages   = {25}
+}
 @inproceedings{Melekhova2015EstimatingWS,
   title     = {Estimating Working Set Size by Guest OS Performance Counters Means},
   author    = {Anna Melekhova and Larisa Markeeva},

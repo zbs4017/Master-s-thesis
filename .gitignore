@@ -13,4 +13,6 @@
 *.lot
 !./example.pdf
 *.pdf
+!pic/*.pdf
 .DS_Store
+.specstory
