@@ -42,6 +42,7 @@
 \RequirePackage{amsthm}
 \RequirePackage{lmodern}
 \RequirePackage[nopostdot]{glossaries}
+\RequirePackage{amsmath}
 \RequirePackage{mathspec}
 
 \RequirePackage{xeCJK}
@@ -102,7 +103,7 @@
 \RequirePackage[normalem]{ulem}
 \RequirePackage{enumitem}
 
-\RequirePackage[algochapter, boxruled, linesnumbered]{algorithm2e}
+\RequirePackage[algochapter, boxruled, ruled,vlined,linesnumbered]{algorithm2e}
 
 \RequirePackage{etoolbox}
 \RequirePackage{newfloat}
