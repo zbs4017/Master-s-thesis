@@ -32,6 +32,32 @@
             ]
         }
     ],
+    "latex-workshop.synctex.synctexjs.enabled": true,
+    "latex-workshop.synctex.afterBuild.enabled": true,
+    "latex-workshop.view.pdf.viewer": "tab",
+    // "latex-workshop.latex.clean.fileTypes": [
+    //     "%DOCFILE%.aux",
+    //     "%DOCFILE%.bbl",
+    //     "%DOCFILE%.blg",
+    //     "%DOCFILE%.idx",
+    //     "%DOCFILE%.ind",
+    //     "%DOCFILE%.lof",
+    // ],
+    // "latex-workshop.latex.autoClean.run": "never",
+    // "latex-workshop.latex.clean.fileTypes": [
+    //     "*.aux",
+    //     "*.bbl",
+    //     "*.blg",
+    //     "*.idx",
+    //     "*.ind",
+    //     "*.lof",
+    //     "*.lot",
+    //     "*.toc",
+    //     "*.out",
+    //     "*.log",
+    // ],
+    "latex-workshop.latex.clean.enabled": false, //可以设置为true或者onBuilt
+    "latex-workshop.latex.autoClean.run": "never", // 或者 "onSave"
     // ③ 让插件默认使用这一个编译方案
     "latex-workshop.latex.recipeDefault": "xe->bib->xe->xe"
 }
