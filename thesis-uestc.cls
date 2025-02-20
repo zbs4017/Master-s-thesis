@@ -105,6 +105,7 @@
 
 \RequirePackage[algochapter, boxruled, ruled,vlined,linesnumbered]{algorithm2e}
 
+\RequirePackage{varwidth}
 \RequirePackage{etoolbox}
 \RequirePackage{newfloat}
 \RequirePackage[resetlabels]{multibib}
