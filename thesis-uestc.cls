@@ -61,9 +61,9 @@
   \newfontfamily{\heiti@letter}{STHeiti}
   \setallmainfonts{Times New Roman}
 \else
-  \setCJKmainfont[AutoFakeBold=true]{fzsong.ttf}
-  \newCJKfontfamily{\heiti}{fzhei.ttf}
-  \newfontfamily{\heiti@letter}{fzhei.ttf}
+  \setCJKmainfont[AutoFakeBold=true]{simsun.ttc}
+  \newCJKfontfamily{\heiti}{simhei.ttf}
+  \newfontfamily{\heiti@letter}{simhei.ttf}
   \setallmainfonts[
     % Path=/root/.fonts/,
     BoldFont=timesbd.ttf,

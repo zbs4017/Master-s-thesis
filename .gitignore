@@ -16,3 +16,4 @@
 !pic/*.pdf
 .DS_Store
 .specstory
+tmp/
