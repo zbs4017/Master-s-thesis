@@ -1,14 +1,30 @@
 
 \documentclass[promaster]{thesis-uestc}
 
-\title{面向容器环境异构后端的最小工作集优化研究}{Working Set Optimization Research for Heterogeneous Backend Systems in Containerized Environments}
+\title{面向异构后端的冷页面自适应主动卸载机制研究}{Research on Adaptive and Proactive Cold Page Offloading Mechanism for Heterogeneous Backends}
 \synctex=1
 \author{张兵帅}{Zhang Bingshuai}
 \advisor{段翰聪\chinesespace 研究员}{Prof. Duan Hancong}
 \school{计算机科学与工程学院}{School of Computer Science and Engineering}
 \major{计算机技术}{Computer Technology}
 \studentnumber{202222080514}
-
+\usepackage{listings}
+\usepackage{color}
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    breaklines=true,
+    showstringspaces=false,
+    frame=single,
+    tabsize=4
+}
+\renewcommand{\blankpage}{\newpage} % 取消空白页
 % require all the usepackages here
 % \usepackage{algorithm2e}
 
@@ -39,11 +55,11 @@
 %     \newpage
 % \fi
 % }{}{}{}
-% \SetKwInOut{Input}{输入}
-% \SetKwInOut{Output}{输出}
+
 \SetKwInOut{Input}{Input}
 \SetKwInOut{Output}{Output}
-
+\usepackage{tabularx}
+\usepackage{microtype}
 \begin{document}
 
 \makecover
