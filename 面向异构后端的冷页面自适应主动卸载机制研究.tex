@@ -5,7 +5,7 @@
 \synctex=1
 \author{张兵帅}{Zhang Bingshuai}
 \advisor{段翰聪\chinesespace 研究员}{Prof. Duan Hancong}
-\school{计算机科学与工程学院}{School of Computer Science and Engineering}
+\school{计算机科学与工程学院（网络空间安全学院）}{School of Computer Science and Engineering}
 \major{计算机技术}{Computer Technology}
 \studentnumber{202222080514}
 \usepackage{listings}
@@ -24,7 +24,7 @@
     frame=single,
     tabsize=4
 }
-\renewcommand{\blankpage}{\newpage} % 取消空白页
+% \renewcommand{\blankpage}{\newpage} % 取消空白页
 % require all the usepackages here
 % \usepackage{algorithm2e}
 
@@ -62,7 +62,15 @@
 \usepackage{microtype}
 \begin{document}
 
-\makecover
+% \makecover
+
+
+            % 插入封面 (假设封面 PDF 文件名为 cover.pdf，位于 misc 子目录下)
+\IfFileExists{misc/电子科技大学研究生学位论文封面及扉页.pdf}{%
+\includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页.pdf}
+}{%
+\PackageError{mypackage}{File not found}{The cover PDF file was not found.}%如果没找到文件,报错
+}
 
 % This is a template of mutiple files.
 % The folders chapters/ and misc/ have the related files
@@ -73,7 +81,8 @@
 
 % table of contents
 \thesistableofcontents
-
+% \thesistableofcontents
+\let\cleardoublepage\clearpage  % <-- 关键：重定义 \cleardoublepage
 % thesis contents
 \input{chapter/c1_exordium}
 \input{chapter/c2}
