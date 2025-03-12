@@ -1,4 +1,4 @@
-\chapter{内存管理及相关技术概述}
+\chapter{内存管理及分层内存系统概述}
 
 \section{Linux 内存管理技术}
 
@@ -11,7 +11,7 @@
     \label{物理内存管理}
 \end{figure}
 
-Linux操作系统采用多层次结构管理物理内存，以实现高效的内存分配和回收。如图\ref{物理内存管理}所示，Linux物理内存管理机制从NUMA节点（Node）、内存区域（Zone）、伙伴系统（Buddy System）、页框管理（Page Frame）以及内存探测（Memory Detection）等多个层面进行组织，形成了一个完整且高效的内存管理体系。这种设计不仅能够满足不同硬件设备和软件应用的需求，还能有效降低内存碎片，提高系统整体性能。
+Linux操作系统采用多层次结构管理物理内存，以实现高效的内存分配和回收。如图\ref{物理内存管理}所示，Linux物理内存管理机制从NUMA节点（Node）、内存区域（Zone）、伙伴系统（Buddy System）、页框管理（Page Frame）以及内存探测（Memory Detection）等多个层面进行组织，形成了一个完整且高效的内存管理体系。分层结构不仅能够满足不同硬件设备和软件应用的需求，还能有效降低内存碎片，提高系统整体性能。
 
 在NUMA架构中，Linux将物理内存划分为多个节点，每个节点由 pg\_data\_t 结构表示。该结构包含多个关键成员，例如 node\_zones[] 用于存储节点内的内存区域，node\_mem\_map 指向该节点的页框描述符数组，而 node\_start\_pfn 则记录了节点的起始页帧号。这种设计使得Linux能够充分利用NUMA架构的特性，优化内存访问性能。每个节点进一步划分为多个内存区域，包括 ZONE\_DMA、ZONE\_DMA32 和 ZONE\_NORMAL。这些区域根据物理地址范围和用途进行划分，例如 ZONE\_DMA 适用于 ISA 设备的 DMA 操作，ZONE\_DMA32 适用于只能寻址 32 位内存的设备，而 ZONE\_NORMAL 则用于系统常规内存使用。每个内存区域由 struct zone 结构表示，其中 free\_area[] 用于管理伙伴系统的空闲页框链表，watermark[] 用于控制内存回收的水位线，而 lock 则用于保护并发访问。
 
@@ -69,7 +69,7 @@ cgroups v2 还增强了各控制器间的协同能力。在 v1 中，由于多�
 \subsection{内存回收机制}
 \label{sec:Linux内存回收机制}
 
-Linux操作系统采用层次化的内存管理架构，将物理内存组织为 node 和 zone 的二级结构。为了平衡系统性能与内存使用效率，Linux实现了一套完善的内存回收机制，本节将系统地介绍其工作原理与实现细节。
+Linux操作系统采用层次化内存管理架构，将物理内存组织为node和zone的二级结构。为实现系统性能与内存使用效率的平衡，Linux实现了一套完善的内存回收机制，本文系统阐述其工作原理与实现细节。
 
 \begin{figure}[h]
     \centering
@@ -78,36 +78,53 @@ Linux操作系统采用层次化的内存管理架构，将物理内存组织为
     \label{fig:memory_reclaim_callgraph}
 \end{figure}
 
-
-内存回收的核心目标是在系统内存压力增大时，释放低价值页面以满足新的内存分配需求。Linux通过水位线(watermark)机制监控内存使用状况，当空闲内存低于特定阈值时触发回收。如图\ref{fig:memory_reclaim_callgraph}所示，内存回收机制主要由三种策略组成：
+内存回收的主要目标是在系统内存压力增大时，释放低价值页面以满足新的内存分配需求。Linux通过水位线(watermark)机制监控内存使用状况，当空闲内存低于特定阈值时触发回收。如图\ref{fig:memory_reclaim_callgraph}所示，内存回收机制主要包含以下三种策略：
 
 \begin{itemize}
-    \item 直接回收(Direct Reclaim)：由内存分配失败的进程同步触发，该进程暂停执行直到回收足够内存。
-    \item 周期性回收(Periodic Reclaim)：由kswapd守护进程在后台定期执行，维持系统内存平衡。
-    \item 用户触发回收(User-triggered Reclaim)：通过接口允许用户主动释放缓存和不活跃内存。
+    \item 直接回收(Direct Reclaim)：由内存分配失败的进程同步触发，该进程暂停执行直到回收足够内存
+    \item 周期性回收(Periodic Reclaim)：由kswapd守护进程在后台定期执行，维持系统内存平衡
+    \item 用户触发回收(User-triggered Reclaim)：通过接口允许用户主动释放缓存和不活跃内存
 \end{itemize}
 
-这三种机制虽然触发条件和路径不同，但最终都会调用相同的低层回收函数，如 shrink\_active\_list 、 shrink\_inactive\_list 和 shrink\_page\_list 等，形成统一的回收框架。
+这三种机制虽然触发条件和路径不同，但最终都会调用相同的底层回收函数，如shrink\_active\_list、shrink\_inactive\_list和shrink\_page\_list等，形成统一的回收框架。
 
-同步内存回收由 alloc\_page\_buffers 、 \_\_getblk 和 \_\_alloc\_pages 等函数触发，最终通过 free\_more\_memory 和 \_\_alloc\_pages\_slowpath 路径执行回收。周期性回收由kswapd守护进程负责，通过 balance\_pgdat 和\allowbreak kswapd\_shrink\_zone 函数调整页面分配。用户触发回收则通过 drop\_caches 接口实现，使用 drop\_slab 和 drop\_pagecache\_sb 函数释放缓存。这三种机制最终在 shrink\_active\_list 、 shrink\_inactive\_list 和 shrink\_page\_list 等底层函数处汇合。
+同步内存回收由alloc\_page\_buffers、\_\_getblk和\_\_alloc\_pages等函数触发，最终通过free\_more\_memory和\_\_alloc\_pages\_slowpath路径执行回收。周期性回收由kswapd守护进程负责，通过balance\_pgdat和kswapd\_shrink\_zone函数调整页面分配。用户触发回收则通过drop\_caches接口实现，使用drop\_slab和drop\_pagecache\_sb函数释放缓存。这三种机制最终在shrink\_active\_list、shrink\_inactive\_list和\\shrink\_page\_list等底层函数处汇合。
 
-kswapd线程被唤醒后，以 order 和 zone 数组下标 classzone\_idx 为参数调用 balance\_pgdat() 。该函数按照 normal->dma32->dma 顺序扫描 zone ，通过 zone\_balanced() 判断 zone 是否平衡。判断依据是两个条件：一是 zone 空闲内存超过高水位线；二是内存在0到指定 order 之间平衡分布（即总内存超过高水位， order-1 及以上内存超过高水位的\(\frac{1}{2}\)，依此类推）。系统确定第一个不平衡 zone 的下标为 end\_zone ，仅针对0至 end\_zone 范围执行回收，避免与其他进程的内存分配冲突。
+kswapd线程被唤醒后，以order和zone数组下标classzone\_idx为参数调用balance\_pgdat()。该函数按照normal->dma32->dma顺序扫描zone，通过zone\_balanced()判断zone是否平衡。判断依据包括：zone空闲内存超过高水位线，以及内存在0到指定order之间平衡分布（即总内存超过高水位，order-1及以上内存超过高水位的\(\frac{1}{2}\)，依此类推）。系统确定第一个不平衡zone的下标为end\_zone，仅针对0至end\_zone范围执行回收，避免与其他进程的内存分配冲突。
 
-实际回收由 shrink\_zone() 执行，它扫描LRU链表中特定数量的页面。Linux内存回收机制采用了精细的页面分类管理策略。系统实际上维护了四个LRU（最近最少使用）链表，将页面按照两个维度进行分类：活跃度（ active /inactive）和页面类型（匿名页/文件页）。这四个链表分别为：active匿名页链表、inactive匿名页链表、active文件页链表和inactive文件页链表。
-当页面首次加入LRU系统时，根据其类型被放入相应的inactive链表；页面被访问后会设置访问标记；在inactive链表上被扫描且已标记的页面会被提升至相应类型的active链表；而在active链表上被扫描且未标记的页面则会被降级回相应类型的inactive链表。这种设计确保了频繁使用的页面能够留在内存中，而不常用的页面则成为回收的候选对象。
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth,keepaspectratio]{内存回收流程示意图.pdf}
+    \caption{内存回收流程示意图}
+    \label{fig:memory_reclaim_mechanism}
+\end{figure}
 
-这种区分文件页和匿名页的设计使得系统能够针对不同类型的页面实施差异化的回收策略，因为文件页（如页缓存）可以直接丢弃或写回磁盘，而匿名页（如进程堆栈数据）则需要写入交换空间，成本更高。系统通过swappiness参数调节这两类页面回收的倾向性，在保障性能的同时优化内存使用效率。
+如图\ref{fig:memory_reclaim_mechanism}所示，Linux内存回收机制采用精细的页面分类管理策略，通过结构化的回收流程实现高效的内存资源管理。系统维护四个LRU（最近最少使用）链表，将页面按照活跃度（active/inactive）和页面类型（匿名页/文件页）进行二维分类：active匿名页链表、inactive匿名页链表、active文件页链表和inactive文件页链表。从理论角度分析，Linux的LRU链表实现基于多队列理论（Multi-Queue Theory）的变体，针对不同类型页面的访问模式特征进行了优化。这种设计解决了传统LRU算法面临的扫描污染（Scan Pollution）问题——即顺序访问大量数据时可能会驱逐出所有热点数据。通过区分文件页和匿名页，系统能够针对性地处理不同的内存访问模式：文件页通常表现为时空局部性较强的访问模式，而匿名页则更多地呈现出工作集（Working Set）特征。
 
-页面回收决策过程包含多个关键步骤：首先检查页面是否被锁定或写回，是则标记为不活动；否则检查是否被引用，若在用户态地址空间或交换高速缓存中则标记为活动；对于不在交换缓存的匿名页面，尝试通过 add\_to\_swap() 加入交换区；对于用户地址空间中的页面，调用 try\_to\_unmap() 解除映射；对于脏页面，检查是否为匿名页且无法I/O，若可I/O则调用 pageout() 写出；对于缓冲区页面，调用 try\_to\_release\_page() 释放。最终，根据页面类型从相应缓存中删除并释放页面。
+实际回收由shrink\_zone()函数执行，该函数按照以下步骤进行操作：
 
-直接回收过程调用 try\_to\_free\_pages() ，以zonelist顺序（通常下标从大到小）调用 shrink\_zone() ，与kswapd扫描顺序（从小到大）相反，避免了重复扫描同一区域。Linux对文件页面和匿名页面采用差异化处理策略：文件页面可直接丢弃（如不脏）或写回磁盘，匿名页面需写入交换空间，成本更高。swappiness参数控制回收文件页与匿名页的倾向性。
+\begin{enumerate}
+    \item shrink\_zone()首先调用get\_scan\_count()确定在文件页和匿名页中需要回收的页面数量。这一决策受到系统swappiness参数的影响，该参数调节系统对文件页与匿名页回收的倾向性
+  
+    \item 随后，回收过程进入shrink\_list()函数，该函数会进一步调用shrink\_active\_list()和shrink\_inactive\_list()分别处理活跃和非活跃页面链表
+  
+    \item shrink\_active\_list()扫描活跃链表中的页面，根据get\_scan\_count()确定的文件页和匿名页回收数量，将未被标记访问的页面降级到相应的非活跃链表中，为后续回收做准备。这一过程体现了系统对热点数据的保护机制
+  
+    \item shrink\_inactive\_list()则负责从非活跃链表中实际回收页面，对于符合条件的页面执行具体的回收操作
+\end{enumerate}
 
-Linux内存回收机制通过多层次、多路径设计实现了系统资源的高效管理。通过精确控制页面老化、回收优先级和页面类型处理，在保障系统性能和优化资源利用之间取得平衡，为系统稳定性提供保障。
+Linux内存管理系统通过区分文件页和匿名页实现了精细化的回收策略，这一设计基于对不同类型页面特性和回收成本的深入分析。文件页（如页缓存）可以直接丢弃（若为干净页）或写回磁盘（若为脏页），而匿名页（如进程堆栈数据）则需要写入交换空间，涉及更复杂的I/O操作，因此回收成本更高。这种区分使系统能够根据内存压力和页面特性做出资源优化的决策。
+
+在执行页面回收过程中，系统针对不同类型的页面采取差异化处理策略。对于文件页，系统通过Cleancache接口或传统文件系统I/O接口将数据写回存储设备，如图\ref{fig:memory_reclaim_mechanism}中的$Page_{6}$所示；对于匿名页，系统则通过Frontswap接口或标准交换机制将数据转移到交换空间，如图中所示的$Page_{12}$。Cleancache和Frontswap作为超越内存框架的核心组件，为内存管理提供了额外的存储层次，其详细工作机制可参考\ref{sec:超越内存框架}节。
+
+页面回收决策过程遵循严格的逻辑流程，包含多个关键步骤：首先检查页面是否被锁定或正在写回，若是则将其标记为不活动；否则检查页面是否被引用，若在用户态地址空间或交换高速缓存中被引用，则标记为活动；对于不在交换缓存的匿名页面，系统调用add\_to\_swap()函数尝试在交换区分配空间；对于映射在用户地址空间的页面，调用try\_to\_unmap()函数解除页表映射；对于脏页面，系统评估其I/O能力，若可执行I/O则调用pageout()函数写出数据；对于缓冲区页面，调用try\_to\_release\_page()函数释放资源。最终，系统根据页面类型从相应缓存中删除页面引用并释放物理页面。
+
+在直接回收流程中，系统通过try\_to\_free\_pages()函数启动回收过程，并采用与周期性回收（kswapd）相反的扫描顺序：以zonelist顺序（通常下标从大到小）调用shrink\_zone()函数，而kswapd则采用从小到大的扫描顺序。这种互补设计有效避免了重复扫描同一内存区域，减少了直接回收与kswapd之间的资源竞争，提高了整体回收效率，并优化了NUMA架构下的内存访问局部性。这一精心设计的回收机制确保了Linux系统在各种内存压力情况下都能保持稳定性能。
 
 \section{分层内存架构}
 
 \subsection{超越内存框架}
-
+\label{sec:超越内存框架}
 随着虚内存密集型应用的增加，传统的内存管理机制面临着严峻挑战。Linux内核引入的超越内存（Transcendent Memory）框架通过Frontswap和Cleancache两个前端接口，为这一问题提供了创新解决方案。
 
 超越内存框架的核心理念是利用不直接被内核寻址的超越内存作为传统RAM和持久化存储之间的中间层。这种内存可能是压缩的本地内存、远程系统的RAM或其他形式的存储媒介，其容量可能随时变化且不可预测。Frontswap和Cleancache作为该框架的前端接口，分别处理不同类型的内存页面：Frontswap处理匿名页面（如堆栈数据），而Cleancache处理与文件相关的页面缓存。
@@ -194,7 +211,7 @@ Linux内存回收机制通过多层次、多路径设计实现了系统资源的
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{RDMA.pdf}
+    \includegraphics[width=\textwidth,keepaspectratio]{RDMA.pdf}
     \caption{RDMA 技术架构}
     \label{fig:RDMA}
 \end{figure}

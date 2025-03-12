@@ -29,7 +29,11 @@
     \item 对于异构存储后端，高性能设备（如NVM）处理同等数量的缺页中断所需时间更短，计算得到的内存压力值也相应较低，准确反映了实际系统状态。
 \end{enumerate}
 
-这种基于时间的度量方法能够自动适应工作集动态变化过程中的非线性行为，避免了人工建立复杂映射函数的需要。通过时间维度归一化处理（即除以 $T_{epoch}$），该指标可有效消除异构卸载后端由于绝对性能差异带来的度量偏差。对于不同性能的存储设备（如机械硬盘与NVM），即使发生相同次数的缺页中断，其处理时间会有显著差异。基于时间的度量自然地将这种性能差异纳入考量：高性能设备（如NVM）处理同等数量的缺页中断所需时间更短，因此计算得到的内存压力值也相应较低，这符合实际系统资源压力的真实状态。
+该方法直接测量因内存压力导致的性能损失时间，而非间接指标。同步内存回收发生时，应用程序必然被阻塞，这部分时间的占比直接反映了应用因内存不足而遭受的性能损失，建立了内存压力与性能影响之间的直接联系。
+
+在异构卸载环境中，该方法能够自动适应不同存储后端的性能特性。对于高性能存储设备（如NVM或Optane），即使发生相同次数的缺页中断，由于其处理速度更快，测得的同步回收时间会相应减少，从而体现出较低的内存压力值；而对于传统机械硬盘，相同次数的缺页中断会导致更长的回收时间，反映出更高的性能损失和内存压力。这种适应性消除了传统方法中需要为不同存储设备单独调整评估参数的复杂性。
+
+无论应用程序是内存密集型、计算密集型还是I/O密集型，当内存不足导致性能下降时，都会表现为同步回收时间的增加。这使得该方法能够在不同类型的工作负载下保持一致的评估标准，无需针对特定应用类型进行定制化调整。
 
 基于上述理论分析，下一节将详细介绍如何设计和实现基于同步内存回收延迟的内存压力量化算法，包括多核系统中的加权聚合策略、指数移动平均平滑处理以及定点数优化技术。
 
@@ -334,7 +338,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{生产者和消费者.pdf}
+    \includegraphics[width=\textwidth,keepaspectratio]{生产者和消费者.pdf}
     \caption{生产者消费者架构图}
     \label{fig:producer-consumer}
 \end{figure}
@@ -372,7 +376,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{时钟中断.pdf}
+    \includegraphics[width=0.8\textwidth,keepaspectratio]{时钟中断.pdf}
     \caption{时钟中断流程图}
     \label{fig:time-ticker}
 \end{figure}
@@ -424,7 +428,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{seqlock.pdf}
+    \includegraphics[width=\textwidth,keepaspectratio]{seqlock.pdf}
     \caption{序列锁（Seqlock）原理示意图}
     \label{fig:seqlock}
 \end{figure}
@@ -520,10 +524,6 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 \end{algorithm}
 
 算法\ref{alg:update_timestamps}处理采样时间管理。第1-2行检查是否达到下次更新时间，避免过早执行。第3行根据公式\ref{eq:missed_periods}计算错过的周期数。第4行应用公式\ref{eq:next_execution}更新下次执行时刻，保持采样相位一致性，防止时间偏移累积。这种相位校准机制确保了即使在系统负载波动时，内存压力监测依然能保持连续稳定的采样节奏。
-
-算法\ref{alg:exponential_smoothing}实现了指数平滑处理。第1-2行计算并限制样本时间，应用\ref{sec:time_calibration_and_data_processing}节提出的截断补偿机制。第4行将样本时间转换为百分比并用定点数表示，实现\ref{sec:fixed_point_optimization}节的定点数优化。第5-6行处理连续多个周期未更新的情况，使用fixed\_power\_int函数实现指数加速收敛。第7行使用指数加权公式计算新的内存压力值，定点数表示的exp和$(2^{10}-\text{exp})$分别对应公式\ref{eq:EMA}中的\(\alpha\)和\((1-\alpha)\)。第8-9行是工程优化，在压力下降时进行微调，提高系统对压力缓解的响应性。
-
-算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
 \begin{algorithm}[htbp]
 \caption{exponential\_smoothing}
 \label{alg:exponential_smoothing}
@@ -553,6 +553,8 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 \(\text{mem\_pressure\_prev}\gets \lfloor \text{new\_mem\_pressure}/2^{10}\rfloor\)\;
 \Return{\(\text{mem\_pressure\_prev}\)}
 \end{algorithm}
+
+算法\ref{alg:exponential_smoothing}实现了指数平滑处理。第1-2行计算并限制样本时间，应用\ref{sec:time_calibration_and_data_processing}节提出的截断补偿机制。第4行将样本时间转换为百分比并用定点数表示，实现\ref{sec:fixed_point_optimization}节的定点数优化。第5-6行处理连续多个周期未更新的情况，使用fixed\_power\_int函数实现指数加速收敛。第7行使用指数加权公式计算新的内存压力值，定点数表示的exp和$(2^{10}-\text{exp})$分别对应公式\ref{eq:EMA}中的\(\alpha\)和\((1-\alpha)\)。第8-9行是工程优化，在压力下降时进行微调，提高系统对压力缓解的响应性。
 \SetKwFunction{FixedPowerInt}{fixed\_power\_int}
 \SetKwProg{Fn}{Function}{:}{}
 \begin{algorithm}[htbp]
@@ -576,6 +578,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
         \Return \(result\)\;
     }
 \end{algorithm}
+算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
 
 
 
