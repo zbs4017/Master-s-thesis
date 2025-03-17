@@ -52,7 +52,7 @@
 
 其中，\(\Delta T\) 为采样周期，\(n\) 为处理器核心数量，简单平均算法在多核系统中存在两个关键理论缺陷，影响其准确表征系统内存压力的能力。
 
-首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的"空闲核心稀释效应"（idle core dilution effect）。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞（均为0秒），则系统压力计算结果为：
+首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应（idle core dilution effect）。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞（均为0秒），则系统压力计算结果为：
 \[
 Pressure_{simple} = \frac{0.5 + 0.1 + 0 + 0}{1.0 \times 4} \times 100\% = 15\%
 \]
@@ -444,7 +444,6 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 
 对于Per-CPU数据中的累计时间，系统选择了序列锁保护机制。这一选择主要基于以下考量：首先，时钟中断处理函数需要频繁更新该数据，而中断处理程序不能被阻塞，序列锁恰好提供了无阻塞写入能力；其次，Per-CPU数据结构相对简单，多为32位或64位无符号整型，写操作（累加时间）执行快速，读取时可整体复制，这些特性与序列锁的适用条件高度吻合；此外，内存同步回收通常不是高频事件，对停顿时间的累加操作较少，构成典型的读多写少场景，这与序列锁的设计理念完全契合。
 
-而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁（Mutex）保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
 \begin{algorithm}[htbp]
     \caption{Memory Pressure Calculation}
     \label{alg:mem_pressure_optimized}
@@ -471,89 +470,88 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
     \qquad \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev},\)
     \qquad \(\text{period}, \text{mem\_pressure\_prev}, \text{exp}, \text{missed})\)\;
 \end{algorithm}
+而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁（Mutex）保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
+\begin{algorithm}[H]
+    \caption{calculate\_weighted\_pressure\_time}
+    \label{alg:calculate_weighted_pressure_time}
+    \SetAlgoLined
+    \DontPrintSemicolon
+    \Input{\(\text{total\_time}_i, \text{total\_time\_prev}_i, \text{total\_work\_time}_i, \text{total\_work\_time\_prev}_i\) (for each CPU \(i\))}
+    \Output{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
+    \(\text{weight\_pressure\_time} \gets 0,\quad \text{work\_time} \gets 0\)\;
+    \For{each CPU \(i\)}{
+        \(\text{weight\_pressure\_time} \gets \text{weight\_pressure\_time} + (\text{total\_time}_i - \text{total\_time\_prev}_i) \times (\text{total\_work\_time}_i - \text{total\_work\_time\_prev}_i)\)\;
+        \(\text{work\_time} \gets \text{work\_time} + (\text{total\_work\_time}_i - \text{total\_work\_time\_prev}_i)\)\;
+    }
+    \Return{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
+    \end{algorithm}
 至于task\_struct中的in\_mem\_mempressure标志，系统采用了一种巧妙的隐式保护策略。该标志在同步内存回收开始时置位，结束时复位，这些操作通常发生在进程调度环境中。由于内核在操作过程中已持有相应CPU的运行队列锁并关闭本地中断，这自然形成了一道保护屏障，防止其它CPU或中断对当前进程的调度产生干扰。因此，在时钟中断处理函数中检查该标志时，运行队列锁的存在保证了当前进程不会被调度到其它CPU，使得直接访问该标志是安全的，无需引入额外的锁机制。这种复用已有同步原语的策略，不仅简化了系统设计，还有效降低了同步开销。
 
+\begin{algorithm}[H]
+    \caption{update\_timestamps}
+    \label{alg:update_timestamps}
+    \SetAlgoLined
+    \DontPrintSemicolon
+    \Input{\(\text{now}, \text{next\_update\_time}, \text{last\_update\_time}, T\)}
+    \Output{ \(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
+    \If{\(\text{now} < \text{next\_update\_time}\)}{
+    \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, 0, 0\)}
+    }
+    \(\text{missed} \gets \lfloor(\text{now}-\text{next\_update\_time})/T\rfloor\)\;
+    \(\text{next\_update\_time} \gets \text{next\_update\_time} + (\text{missed}+1) \times T\)\;
+    \(\text{period}\gets \text{now}-\text{last\_update\_time}\)\;
+     \(\text{last\_update\_time}\gets \text{now}\)\;
+    \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
+    \end{algorithm}
 总体而言，通过这三种针对性的临界区保护策略，本框架在确保数据一致性和完整性的前提下，最大限度地降低了同步开销，从而显著提升了系统的整体性能和响应能力。实验结果表明，这种差异化的保护策略在实际应用中表现出色，能够有效地平衡保护强度与性能开销之间的权衡。
-
 
 \subsection{内存压力计算工程实现}
 \label{sec:内存压力计算算法}
-
 本节聚焦于内存压力量化算法的工程实现。基于\ref{sec:基于同步内存回收延迟的内存压力量化算法}的理论模型，本文设计了一套高效的算法体系，实现了从原始数据采集到最终压力指标输出的完整计算流程。核心实现遵循先聚合、再校准、后平滑的处理逻辑，同时采用定点数运算优化性能。
 
+
+
+ \begin{algorithm}[H]
+     \caption{exponential\_smoothing}
+     \label{alg:exponential_smoothing}
+     \SetAlgoLined
+     \DontPrintSemicolon
+     \Input{
+         \begin{varwidth}{\linewidth}
+           \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev}, \text{period}\)\\
+           \(\text{mem\_pressure\_prev}, \text{exp}, \text{missed}\)
+         \end{varwidth}
+     }
+     \Output{\(\text{mem\_pressure\_prev}\)}
+     
+     \(\text{sample\_time}\gets \text{mem\_pressure\_time}-\text{mem\_pressure\_time\_prev}\)\;
+     \If{\(\text{sample\_time}>\text{period}\)}{
+         \(\text{sample\_time}\gets \text{period}\)
+     }
+     \(\text{mem\_pressure\_time\_prev} \gets \text{mem\_pressure\_time\_prev} + \text{sample\_time}\)\;
+     \(\text{tmp\_mem\_pressure}\gets \lfloor(\text{sample\_time}\times 100\times 2^{10})/\text{period}\rfloor\)\;
+     \If{\(\text{missed}>0\)}{
+       \(\text{exp} \gets \text{fixed\_power\_int}(\text{exp}, \text{missed})\)
+     }
+     \(\text{new\_mem\_pressure}\gets \text{mem\_pressure\_prev}\times \text{exp} + \text{tmp\_mem\_pressure}\times(2^{10}-\text{exp})\)\;
+     \If{\(\text{mem\_pressure\_prev}>\text{tmp\_mem\_pressure}\)}{
+       \(\text{new\_mem\_pressure} \gets \text{new\_mem\_pressure} + (2^{10}-1)\)
+     }
+     \(\text{mem\_pressure\_prev}\gets \lfloor \text{new\_mem\_pressure}/2^{10}\rfloor\)\;
+     \Return{\(\text{mem\_pressure\_prev}\)}
+ \end{algorithm}
 算法\ref{alg:mem_pressure_optimized}展示了内存压力计算的主流程。第1行调用\\
  calculate\_weighted\_pressure\_time 函数实现\ref{sec:weighted_aggregation}节提出的多核加权聚合模型。第2行将加权后的内存压力时间转换为百分比表示，同时通过max函数处理工作时间为零的边缘情况。第3行调用 update\_timestamps 函数实现时间校准机制，处理采样周期偏移问题。第4行应用 exponential\_smoothing 函数实现指数平滑处理，输出最终压力值。
 
-\begin{algorithm}[htbp]
-\caption{calculate\_weighted\_pressure\_time}
-\label{alg:calculate_weighted_pressure_time}
-\SetAlgoLined
-\DontPrintSemicolon
-\Input{\(\text{total\_time}_i, \text{total\_time\_prev}_i, \text{total\_work\_time}_i, \text{total\_work\_time\_prev}_i\) (for each CPU \(i\))}
-\Output{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
-\(\text{weight\_pressure\_time} \gets 0,\quad \text{work\_time} \gets 0\)\;
-\For{each CPU \(i\)}{
-    \(\text{weight\_pressure\_time} \gets \text{weight\_pressure\_time} + (\text{total\_time}_i - \text{total\_time\_prev}_i) \times (\text{total\_work\_time}_i - \text{total\_work\_time\_prev}_i)\)\;
-    \(\text{work\_time} \gets \text{work\_time} + (\text{total\_work\_time}_i - \text{total\_work\_time\_prev}_i)\)\;
-}
-\Return{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
-\end{algorithm}
-
 算法\ref{alg:calculate_weighted_pressure_time}实现了多核加权聚合。第3行是该算法的核心，它通过回收时间增量与工作时间增量的乘积累加，实现了公式\ref{eq:weighted_aggregation}中的权重聚合，避免了空闲核心的稀释效应。这种实现方式优于显式维护权重数组的方法，具有更高的计算效率。第4行累加工作时间增量，为后续计算压力百分比提供分母。
 
-
-\begin{algorithm}[htbp]
-\caption{update\_timestamps}
-\label{alg:update_timestamps}
-\SetAlgoLined
-\DontPrintSemicolon
-\Input{\(\text{now}, \text{next\_update\_time}, \text{last\_update\_time}, T\)}
-\Output{ \(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
-\If{\(\text{now} < \text{next\_update\_time}\)}{
-\Return{\(\text{next\_update\_time}, \text{last\_update\_time}, 0, 0\)}
-}
-\(\text{missed} \gets \lfloor(\text{now}-\text{next\_update\_time})/T\rfloor\)\;
-\(\text{next\_update\_time} \gets \text{next\_update\_time} + (\text{missed}+1) \times T\)\;
-\(\text{period}\gets \text{now}-\text{last\_update\_time}\)\;
- \(\text{last\_update\_time}\gets \text{now}\)\;
-\Return{\(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
-\end{algorithm}
-
 算法\ref{alg:update_timestamps}处理采样时间管理。第1-2行检查是否达到下次更新时间，避免过早执行。第3行根据公式\ref{eq:missed_periods}计算错过的周期数。第4行应用公式\ref{eq:next_execution}更新下次执行时刻，保持采样相位一致性，防止时间偏移累积。这种相位校准机制确保了即使在系统负载波动时，内存压力监测依然能保持连续稳定的采样节奏。
-\begin{algorithm}[htbp]
-\caption{exponential\_smoothing}
-\label{alg:exponential_smoothing}
-\SetAlgoLined
-\DontPrintSemicolon
-\Input{
-    \begin{varwidth}{\linewidth}
-      \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev}, \text{period}\)\\
-      \(\text{mem\_pressure\_prev}, \text{exp}, \text{missed}\)
-    \end{varwidth}
-}
-\Output{\(\text{mem\_pressure\_prev}\)}
-
-\(\text{sample\_time}\gets \text{mem\_pressure\_time}-\text{mem\_pressure\_time\_prev}\)\;
-\If{\(\text{sample\_time}>\text{period}\)}{
-    \(\text{sample\_time}\gets \text{period}\)
-}
-\(\text{mem\_pressure\_time\_prev} \gets \text{mem\_pressure\_time\_prev} + \text{sample\_time}\)\;
-\(\text{tmp\_mem\_pressure}\gets \lfloor(\text{sample\_time}\times 100\times 2^{10})/\text{period}\rfloor\)\;
-\If{\(\text{missed}>0\)}{
-  \(\text{exp} \gets \text{fixed\_power\_int}(\text{exp}, \text{missed})\)
-}
-\(\text{new\_mem\_pressure}\gets \text{mem\_pressure\_prev}\times \text{exp} + \text{tmp\_mem\_pressure}\times(2^{10}-\text{exp})\)\;
-\If{\(\text{mem\_pressure\_prev}>\text{tmp\_mem\_pressure}\)}{
-  \(\text{new\_mem\_pressure} \gets \text{new\_mem\_pressure} + (2^{10}-1)\)
-}
-\(\text{mem\_pressure\_prev}\gets \lfloor \text{new\_mem\_pressure}/2^{10}\rfloor\)\;
-\Return{\(\text{mem\_pressure\_prev}\)}
-\end{algorithm}
-
 算法\ref{alg:exponential_smoothing}实现了指数平滑处理。第1-2行计算并限制样本时间，应用\ref{sec:time_calibration_and_data_processing}节提出的截断补偿机制。第4行将样本时间转换为百分比并用定点数表示，实现\ref{sec:fixed_point_optimization}节的定点数优化。第5-6行处理连续多个周期未更新的情况，使用fixed\_power\_int函数实现指数加速收敛。第7行使用指数加权公式计算新的内存压力值，定点数表示的exp和$(2^{10}-\text{exp})$分别对应公式\ref{eq:EMA}中的\(\alpha\)和\((1-\alpha)\)。第8-9行是工程优化，在压力下降时进行微调，提高系统对压力缓解的响应性。
 \SetKwFunction{FixedPowerInt}{fixed\_power\_int}
 \SetKwProg{Fn}{Function}{:}{}
-\begin{algorithm}[htbp]
+算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
+
+\begin{algorithm}[htb]
     \caption{fixed\_power\_int}
     \label{alg:helper_functions}
     \SetKwFunction{FixedPowerInt}{fixed\_power\_int}
@@ -574,8 +572,6 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
         \Return \(result\)\;
     }
 \end{algorithm}
-算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
-
 
 
 
