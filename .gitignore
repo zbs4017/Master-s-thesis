@@ -8,7 +8,9 @@
 *.toc
 *.out
 *.log
+*.synctex*
 *.xdv
+*.synctex.gz
 *.synctex.gz
 *.lot
 !./example.pdf

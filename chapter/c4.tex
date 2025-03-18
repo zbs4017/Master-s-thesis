@@ -185,7 +185,6 @@ v_{\text{current}} = \min(v, \textit{period}), \quad v_{\text{carryover}} = v - 
 \end{equation}
 
 当系统连续\(n\)个周期未更新时，需要从时刻\(t\)直接推进至时刻\(t+n\)。通过数学归纳法，可以推导此情况下的一般形式：
-
 \begin{equation}
 \text{EMA}(t+n) = \alpha^n \cdot \text{EMA}(t) + \sum_{k=1}^{n} \alpha^{n-k} \cdot (1-\alpha) \cdot \text{Sample}(t+k)
 \end{equation}
