@@ -4,7 +4,7 @@
 
 \subsection{物理内存管理机制}
 
-\begin{figure}[h]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{物理内存管理.pdf}
     \caption{Linux物理内存管理架构}
@@ -52,7 +52,7 @@ Linux将物理内存的最小管理单位定义为页框，通常为4KB。每个
 
 \subsection{虚拟内存分页机制}
 
-\begin{figure}[h]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{页表.pdf}
     \caption{Linux多级页表机制}
@@ -97,7 +97,7 @@ cgroups v2 还增强了各控制器间的协同能力。在 v1 中，由于多�
 
 Linux操作系统采用层次化内存管理架构，将物理内存组织为node和zone的二级结构。为实现系统性能与内存使用效率的平衡，Linux实现了一套完善的内存回收机制，本文系统阐述其工作原理与实现细节。
 
-\begin{figure}[h]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{内存回收调用栈.pdf}
     \caption{内存回收调用栈}
@@ -118,7 +118,7 @@ Linux操作系统采用层次化内存管理架构，将物理内存组织为nod
 
 kswapd线程被唤醒后，以order和zone数组下标classzone\_idx为参数调用balance\_pgdat()。该函数按照normal->dma32->dma顺序扫描zone，通过zone\_balanced()判断zone是否平衡。判断依据包括：zone空闲内存超过高水位线，以及内存在0到指定order之间平衡分布（即总内存超过高水位，order-1及以上内存超过高水位的\(\frac{1}{2}\)，依此类推）。系统确定第一个不平衡zone的下标为end\_zone，仅针对0至end\_zone范围执行回收，避免与其他进程的内存分配冲突。
 
-\begin{figure}[h]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{内存回收流程示意图.pdf}
     \caption{内存回收流程示意图}
@@ -207,7 +207,7 @@ Linux内存管理系统通过区分文件页和匿名页实现了精细化的回
 
 表\ref{tab:storage_comparison}从多个关键指标对比了DRAM、PCM和磁盘这三种存储介质。从表中可以清晰地看出，PCM在延迟和能耗方面均优于传统磁盘，同时在存储密度和成本方面也表现出显著优势。这种综合性能的提升，使得PCM成为未来存储架构中的重要组成部分，尤其是在需要高性能和低延迟的应用场景中。通过将PCM与DRAM结合使用，可以构建一种混合存储架构，既能够满足高性能计算的需求，又能够降低整体存储成本，为计算机系统的性能优化提供了新的可能性。
 
-\begin{table}[h]
+\begin{table}[htb]
     \centering
     \caption{不同存储介质关键性能指标对比}
     \label{tab:storage_comparison}
@@ -233,7 +233,7 @@ Linux内存管理系统通过区分文件页和匿名页实现了精细化的回
 
  RDMA 技术的核心优势在于零复制、内核旁路和 CPU 卸载。零复制指数据能够直接在应用程序的缓冲区之间传输，无需在不同的软件层之间复制数据，从而节省了数据复制的时间开销。内核旁路使应用程序可以在相同的代码上下文中收发数据（这个上下文可以是用户空间也可以是内核空间），节省了上下文切换的时间开销。CPU 卸载则意味着 RDMA 技术可以使用专门的硬件来收发数据而无需 CPU 的干预，因此可以降低远端主机的 CPU 使用率。
 
-\begin{figure}[h]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{RDMA.pdf}
     \caption{RDMA 技术架构}

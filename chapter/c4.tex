@@ -31,7 +31,7 @@
 
 该方法直接测量因内存压力导致的性能损失时间，而非间接指标。同步内存回收发生时，应用程序必然被阻塞，这部分时间的占比直接反映了应用因内存不足而遭受的性能损失，建立了内存压力与性能影响之间的直接联系。
 
-在异构卸载环境中，该方法能够自动适应不同存储后端的性能特性。对于高性能存储设备（如NVM或Optane），即使发生相同次数的缺页中断，由于其处理速度更快，测得的同步回收时间会相应减少，从而体现出较低的内存压力值；而对于传统机械硬盘，相同次数的缺页中断会导致更长的回收时间，反映出更高的性能损失和内存压力。这种适应性消除了传统方法中需要为不同存储设备单独调整评估参数的复杂性。
+在异构卸载环境中，该方法能够自动适应不同存储后端的性能特性。对于高性能卸载后端（如NVM或Optane），即使发生相同次数的缺页中断，由于其处理速度更快，测得的同步回收时间会相应减少，从而体现出较低的内存压力值；而对于传统机械硬盘，相同次数的缺页中断会导致更长的回收时间，反映出更高的性能损失和内存压力。这种适应性消除了传统方法中需要为不同存储设备单独调整评估参数的复杂性。
 
 无论应用程序是内存密集型、计算密集型还是I/O密集型，当内存不足导致性能下降时，都会表现为同步回收时间的增加。这使得该方法能够在不同类型的工作负载下保持一致的评估标准，无需针对特定应用类型进行定制化调整。
 
@@ -207,7 +207,7 @@ v_{\text{current}} = \min(v, \textit{period}), \quad v_{\text{carryover}} = v - 
     
     result \(\gets 1\)\;
     \While{$n > 0$}{
-        \If{$n \,\mathrm{AND}\, 1 \neq 0$}{  \tcp*{Check if lowest bit is 1}
+        \If{$n \,AND\, 1 \neq 0$}{  \tcp*{Check if lowest bit is 1}
             result \(\gets\) result \(\times\) x\;  \tcp*{Multiply result by current power of x}
         }
         x \(\gets x \times x\)\;  \tcp*{Square x for next iteration}
@@ -234,7 +234,7 @@ x^n = x^{\sum_{i=0}^{k} b_i 2^i} = \prod_{i=0}^k (x^{2^i})^{b_i}
 \subsection{定点数优化}
 \label{sec:fixed_point_optimization}
 
-在实时内存压力监测系统中，频繁的数值计算需求对运算效率提出了严格约束。针对内存压力指标计算与 EMA 平滑处理中大量浮点运算可能造成的性能瓶颈，本研究采用基于定点数表示法的优化策略。
+在实时内存压力监测系统中，频繁的数值计算需求对运算效率提出了严格约束。针对内存压力指标计算与 EMA 平滑处理中大量浮点运算可能造成的性能瓶颈，并且某些嵌入式场景中，机器没有浮点计算单元。本研究采用基于定点数表示法的优化策略。
 
 \subsubsection{定点数表示原理}
 
@@ -259,7 +259,7 @@ R' = \frac{D}{F}
 \epsilon = R - R' = R - \frac{D}{F} = R - \frac{\lfloor R \cdot F \rfloor}{F} = \frac{\delta}{F} \quad (0 \leq \delta < 1)
 \end{equation}
 
-由上式可得，单次量化的绝对误差上界为$\frac{1}{F} = 2^{-10} \approx 0.000977$。对于数值$R \geq 1$的场景，相对误差上界为$\frac{2^{-10}}{R} \leq 0.000977$，即相对误差被限定在千分之一以内，满足内存压力监测的精度要求。
+由上式可得，单次量化的绝对误差上界为$\frac{1}{F} = 2^{-10} \approx 0.000977$。对于数值$R \geq 1$的场景，相对误差上界为$\frac{2^{-10}}{R} \leq 0.000977$，即相对误差被限定在千分之一以内，满足内存压力监测的精度要求。并且实际情况\(R\)本身是百分比数，是小于1的。
 
 为全面评估定点数在实际计算过程中的误差传播特性，本节分析加减法和乘法两类基本运算的累积误差。
 
@@ -299,8 +299,6 @@ D_1 \times D_2 = (R_1 \cdot F) \times (R_2 \cdot F) = (R_1 \times R_2) \cdot F^2
     \item 结果量化误差：乘法结果右移时的舍入误差
 \end{enumerate}
 
-详细分析这两部分误差的传播：
-
 输入量化误差分析：设$R_1 = \frac{D_1}{F} + \epsilon_1$和$R_2 = \frac{D_2}{F} + \epsilon_2$，其中$|\epsilon_1|, |\epsilon_2| \leq \frac{1}{F}$。则：
 \[
 \begin{aligned}
@@ -308,20 +306,66 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 &= \frac{D_1 \times D_2}{F^2} + \frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2
 \end{aligned}
 \]
-
-考虑到内存压力监测场景中，$R_1$和$R_2$通常为[0,1]范围内的百分比值或[0,100]范围内的指数衰减因子，可设$|D_1|, |D_2| \leq 100F$。则输入误差传播的上界为：
+考虑到内存压力监测场景中，$R_1$和$R_2$通常为[0,1]范围内的百分比值或[0,1]范围内的指数衰减因子。 对于以Q0.10格式表示[0,1]范围实数，定点数的值范围为[0, $F$]，因此可设$|D_1|, |D_2| \leq F$。 则输入误差传播的上界为：
 \begin{equation}
-|\frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2| \leq \frac{100}{F} + \frac{100}{F} + \frac{1}{F^2} \approx \frac{200}{F}
+\begin{aligned}
+|\frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2| &\leq \frac{|D_1| |\epsilon_2|}{F} + \frac{|D_2| |\epsilon_1|}{F} + |\epsilon_1| |\epsilon_2| \\
+&\leq \frac{F \times (1/F)}{F} + \frac{F \times (1/F)}{F} + (\frac{1}{F}) \times (\frac{1}{F}) \\
+&= \frac{1}{F} + \frac{1}{F} + \frac{1}{F^2} = \frac{2}{F} + \frac{1}{F^2}
+\end{aligned}
 \end{equation}
+由于 $F = 2^{10}$，$\frac{1}{F^2}$ 项非常小，可以忽略不计。因此，输入量化误差传播的上界近似为 $\frac{2}{F}$。
 
 结果量化误差分析：乘法结果右移时的舍入误差上界为$\frac{1}{F}$。
 
 综合两部分误差，定点数乘法运算的总误差上界为：
 \begin{equation}
-|\epsilon_{mul}| \leq \frac{200}{F} + \frac{1}{F} = \frac{201}{F} \approx \frac{201}{2^{10}} \approx 0.196    
+|\epsilon_{mul}| \leq (\frac{2}{F} + \frac{1}{F^2}) + \frac{1}{F} = \frac{3}{F} + \frac{1}{F^2} \approx \frac{3}{F} = \frac{3}{2^{10}} \approx 0.002930
 \end{equation}
 
-这一误差上界在极端情况下可能接近0.2，但在实际应用中，典型的内存压力计算场景涉及较小范围的乘数（如\(\alpha \in [0.5, 0.999]\)），实际误差通常维持在\(2^{-9}\)（约0.002）量级，满足系统对精度的要求。
+虽然理论误差上界约为 $0.002930$，在极端情况下可能接近 $0.02$，但实际应用中，特别是在内存压力计算等场景下，由于乘数通常为较小的值，例如公式 \eqref{eq:EMA} 中的指数衰减因子 $\alpha$，实际误差通常远低于理论上界，并维持在 $2^{-9}$（约 $0.002$）量级，能够满足系统对精度的要求。
+
+
+
+
+% \paragraph{乘法运算的定点误差分析}
+% 定点数乘法会引入误差，主要来源于输入量化和结果量化两个阶段。为了分析这些误差，我们首先回顾定点数乘法的计算过程。对于实数 $R_1$ 和 $R_2$，它们首先被量化为定点数 $D_1 = R_1 \cdot F$ 和 $D_2 = R_2 \cdot F$，其中 $F$ 是比例因子（对于 Q0.10 格式，$F=2^{10}$）。定点数乘法的计算过程可以表示为：
+% \begin{equation}
+% D_1 \times D_2 = (R_1 \cdot F) \times (R_2 \cdot F) = (R_1 \times R_2) \cdot F^2
+% \end{equation}
+
+% 由于输出需要保持 Q0.10 格式，需要进行右移操作，即除以 $F$ 并向下取整：
+% \begin{equation}
+% (D_1 \times D_2) \gg 10 = \lfloor \frac{D_1 \times D_2}{F} \rfloor = \lfloor (R_1 \times R_2) \cdot F \rfloor
+% \end{equation}
+
+% 输入量化误差分析： 假设量化过程引入了误差，使得 $R_1 = \frac{D_1}{F} + \epsilon_1$ 和 $R_2 = \frac{D_2}{F} + \epsilon_2$，其中 $|\epsilon_1|, |\epsilon_2| \leq \frac{1}{F}$ 代表量化误差的界限。将带有误差的定点数表示代入乘法运算，得到：
+% \[
+% \begin{aligned}
+% R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
+% &= \frac{D_1 \times D_2}{F^2} + \frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2
+% \end{aligned}
+% \]
+
+% 公式展开后，除了理想的 $\frac{D_1 \times D_2}{F^2}$ 项，还包含了由于输入量化误差产生的额外项。考虑到 $|D_1|, |D_2| \leq F$ 以及 $|\epsilon_1|, |\epsilon_2| \leq \frac{1}{F}$，输入误差传播的上界可以估计为：
+% \begin{equation}
+% \begin{aligned}
+% |\frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2| &\leq \frac{|D_1| |\epsilon_2|}{F} + \frac{|D_2| |\epsilon_1|}{F} + |\epsilon_1| |\epsilon_2| \\
+% &\leq \frac{F \times (1/F)}{F} + \frac{F \times (1/F)}{F} + (\frac{1}{F}) \times (\frac{1}{F}) \\
+% &= \frac{2}{F} + \frac{1}{F^2}
+% \end{aligned}
+% \end{equation}
+
+% 当 $F = 2^{10}$ 时，$\frac{1}{F^2}$ 项非常小可以忽略，因此输入量化误差传播的上界近似为 $\frac{2}{F}$。
+
+% 结果量化误差分析： 乘法结果右移操作，即公式 (2) 中的 $\lfloor \frac{D_1 \times D_2}{F} \rfloor$，会引入舍入误差，其误差上界为 $\frac{1}{F}$。
+
+% 总误差分析： 综合输入量化误差和结果量化误差，定点数乘法运算的总误差上界 $\epsilon_{mul}$ 为两者之和：
+% \begin{equation}
+% |\epsilon_{mul}| \leq (\frac{2}{F} + \frac{1}{F^2}) + \frac{1}{F} = \frac{3}{F} + \frac{1}{F^2} \approx \frac{3}{F} = \frac{3}{2^{10}} \approx 0.002930
+% \end{equation}
+
+% 虽然理论误差上界约为 $0.002930$，在极端情况下可能接近 $0.02$，但实际应用中，特别是在内存压力计算等场景下，由于乘数通常为较小的值，例如公式 \eqref{eq:EMA} 中的指数衰减因子 $\alpha$，实际误差通常远低于理论上界，并维持在 $2^{-9}$（约 $0.002$）量级，能够满足系统对精度的要求。
 
 \section{基于同步回收延迟的内存压力量化实现}
 \label{sec:基于同步回收延迟的内存压力量化实现}
@@ -372,7 +416,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 \subsection{生产者工作流程}
 
-\begin{figure}[htbp]
+\begin{figure}[htb]
     \centering
     \includegraphics[width=0.8\textwidth,keepaspectratio]{时钟中断.pdf}
     \caption{时钟中断流程图}
@@ -420,30 +464,20 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 
 \subsubsection{临界区的保护}
 
-在生产者消费者模型中，生产者负责采集内存回收过程中的累积时间，而消费者（工作队列）则负责处理这些数据，计算并输出内存压力指标。为了确保数据在并发环境下的完整性和一致性，同时兼顾性能，需要对临界区进行精细的保护。
-
-在详细阐述临界区保护策略之前，有必要先介绍本研究所采用的核心同步机制：序列锁（Seqlock）。序列锁是 Linux 内核提供的一种轻量级同步原语，特别适用于读多写少且写操作简短的场景。其基本原理如图 \ref{fig:seqlock} 所示。序列锁维护一个序列计数器，写操作通过递增该计数器来标识数据更新的开始和结束（奇数表示写操作进行中，偶数表示无写操作）。读操作在开始时记录序列号 read\_seqbegin()，并在读取完成后再次检查序列号 read\_seqretry()。如果序列号发生变化，则表明在读取过程中发生了写操作，读操作需要重试，以确保读取到一致的数据。
-
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{seqlock.pdf}
     \caption{序列锁（Seqlock）原理示意图}
     \label{fig:seqlock}
 \end{figure}
+在生产者消费者模型中，生产者负责采集内存回收过程中的累积时间，而消费者（工作队列）则负责处理这些数据，计算并输出内存压力指标。为了确保数据在并发环境下的完整性和一致性，同时兼顾性能，需要对临界区进行精细的保护。
+
+在详细阐述临界区保护策略之前，有必要先介绍本研究所采用的核心同步机制：序列锁（Seqlock）。序列锁是 Linux 内核提供的一种轻量级同步原语，特别适用于读多写少且写操作简短的场景。其基本原理如图 \ref{fig:seqlock} 所示。序列锁维护一个序列计数器，写操作通过递增该计数器来标识数据更新的开始和结束（奇数表示写操作进行中，偶数表示无写操作）。读操作在开始时记录序列号 read\_seqbegin()，并在读取完成后再次检查序列号 read\_seqretry()。如果序列号发生变化，则表明在读取过程中发生了写操作，读操作需要重试，以确保读取到一致的数据。
+
 
 在本研究中，需要重点保护的临界区主要包括以下三类：
 
-\begin{enumerate}
-    \item  Per-CPU 数据：每个 CPU 核心维护一份独立的数据结构，在表\ref{tab:sensor_data}中可以看到存储了CPU的统计信息。尽管 Per-CPU 变量在更新时本身具有原子性，无需额外加锁，但考虑到消费者需要读取所有 CPU 的 Per-CPU 数据进行聚合计算，因此仍需采取适当的同步措施。
-    \item 全局统计信息：一个全局静态变量，用于存储所有 CPU 停顿时间的累加值，以及用于平滑计算的历史统计数据。该变量的访问涉及多个 CPU 的数据聚合，因此需要严格的保护。
-    \item task\_struct->in\_mem\_mempressure 标志：task\_struct 中的一个标志位，用于标识当前进程是否涉及内存压力。该标志用于指导每次进程切换时，是否需要更新Per-CPU中的in\_direct\_reclaim标志。
-\end{enumerate}
-
-基于对这些数据结构特点和访问模式的深入分析，本研究采用了三种具有针对性的临界区保护策略，以平衡数据一致性与系统性能。
-
-对于Per-CPU数据中的累计时间，系统选择了序列锁保护机制。这一选择主要基于以下考量：首先，时钟中断处理函数需要频繁更新该数据，而中断处理程序不能被阻塞，序列锁恰好提供了无阻塞写入能力；其次，Per-CPU数据结构相对简单，多为32位或64位无符号整型，写操作（累加时间）执行快速，读取时可整体复制，这些特性与序列锁的适用条件高度吻合；此外，内存同步回收通常不是高频事件，对停顿时间的累加操作较少，构成典型的读多写少场景，这与序列锁的设计理念完全契合。
-
-\begin{algorithm}[htbp]
+\begin{algorithm}[H]
     \caption{Memory Pressure Calculation}
     \label{alg:mem_pressure_optimized}
     \SetAlgoLined
@@ -469,7 +503,16 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
     \qquad \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev},\)
     \qquad \(\text{period}, \text{mem\_pressure\_prev}, \text{exp}, \text{missed})\)\;
 \end{algorithm}
-而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁（Mutex）保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
+\begin{enumerate}
+    \item  Per-CPU 数据：每个 CPU 核心维护一份独立的数据结构，在表\ref{tab:sensor_data}中可以看到存储了CPU的统计信息。尽管 Per-CPU 变量在更新时本身具有原子性，无需额外加锁，但考虑到消费者需要读取所有 CPU 的 Per-CPU 数据进行聚合计算，因此仍需采取适当的同步措施。
+    \item 全局统计信息：一个全局静态变量，用于存储所有 CPU 停顿时间的累加值，以及用于平滑计算的历史统计数据。该变量的访问涉及多个 CPU 的数据聚合，因此需要严格的保护。
+    \item task\_struct->in\_mem\_mempressure 标志：task\_struct 中的一个标志位，用于标识当前进程是否涉及内存压力。该标志用于指导每次进程切换时，是否需要更新Per-CPU中的in\_direct\_reclaim标志。
+\end{enumerate}
+
+基于对这些数据结构特点和访问模式的深入分析，本研究采用了三种具有针对性的临界区保护策略，以平衡数据一致性与系统性能。
+
+对于Per-CPU数据中的累计时间，系统选择了序列锁保护机制。这一选择主要基于以下考量：首先，时钟中断处理函数需要频繁更新该数据，而中断处理程序不能被阻塞，序列锁恰好提供了无阻塞写入能力；其次，Per-CPU数据结构相对简单，多为32位或64位无符号整型，写操作（累加时间）执行快速，读取时可整体复制，这些特性与序列锁的适用条件高度吻合；此外，内存同步回收通常不是高频事件，对停顿时间的累加操作较少，构成典型的读多写少场景，这与序列锁的设计理念完全契合。
+
 \begin{algorithm}[H]
     \caption{calculate\_weighted\_pressure\_time}
     \label{alg:calculate_weighted_pressure_time}
@@ -484,24 +527,26 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
     }
     \Return{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
     \end{algorithm}
+而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁（Mutex）保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
+\begin{algorithm}[H]
+        \caption{update\_timestamps}
+        \label{alg:update_timestamps}
+        \SetAlgoLined
+        \DontPrintSemicolon
+        \Input{\(\text{now}, \text{next\_update\_time}, \text{last\_update\_time}, T\)}
+        \Output{ \(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
+        \If{\(\text{now} < \text{next\_update\_time}\)}{
+        \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, 0, 0\)}
+        }
+        \(\text{missed} \gets \lfloor(\text{now}-\text{next\_update\_time})/T\rfloor\)\;
+        \(\text{next\_update\_time} \gets \text{next\_update\_time} + (\text{missed}+1) \times T\)\;
+        \(\text{period}\gets \text{now}-\text{last\_update\_time}\)\;
+         \(\text{last\_update\_time}\gets \text{now}\)\;
+        \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
+\end{algorithm}
+
 至于task\_struct中的in\_mem\_mempressure标志，系统采用了一种巧妙的隐式保护策略。该标志在同步内存回收开始时置位，结束时复位，这些操作通常发生在进程调度环境中。由于内核在操作过程中已持有相应CPU的运行队列锁并关闭本地中断，这自然形成了一道保护屏障，防止其它CPU或中断对当前进程的调度产生干扰。因此，在时钟中断处理函数中检查该标志时，运行队列锁的存在保证了当前进程不会被调度到其它CPU，使得直接访问该标志是安全的，无需引入额外的锁机制。这种复用已有同步原语的策略，不仅简化了系统设计，还有效降低了同步开销。
 
-\begin{algorithm}[H]
-    \caption{update\_timestamps}
-    \label{alg:update_timestamps}
-    \SetAlgoLined
-    \DontPrintSemicolon
-    \Input{\(\text{now}, \text{next\_update\_time}, \text{last\_update\_time}, T\)}
-    \Output{ \(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
-    \If{\(\text{now} < \text{next\_update\_time}\)}{
-    \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, 0, 0\)}
-    }
-    \(\text{missed} \gets \lfloor(\text{now}-\text{next\_update\_time})/T\rfloor\)\;
-    \(\text{next\_update\_time} \gets \text{next\_update\_time} + (\text{missed}+1) \times T\)\;
-    \(\text{period}\gets \text{now}-\text{last\_update\_time}\)\;
-     \(\text{last\_update\_time}\gets \text{now}\)\;
-    \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
-    \end{algorithm}
 总体而言，通过这三种针对性的临界区保护策略，本框架在确保数据一致性和完整性的前提下，最大限度地降低了同步开销，从而显著提升了系统的整体性能和响应能力。实验结果表明，这种差异化的保护策略在实际应用中表现出色，能够有效地平衡保护强度与性能开销之间的权衡。
 
 \subsection{内存压力计算工程实现}
@@ -510,7 +555,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 
 
 
- \begin{algorithm}[H]
+ \begin{algorithm}[htb]
      \caption{exponential\_smoothing}
      \label{alg:exponential_smoothing}
      \SetAlgoLined
@@ -543,13 +588,8 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
  calculate\_weighted\_pressure\_time 函数实现\ref{sec:weighted_aggregation}节提出的多核加权聚合模型。第2行将加权后的内存压力时间转换为百分比表示，同时通过max函数处理工作时间为零的边缘情况。第3行调用 update\_timestamps 函数实现时间校准机制，处理采样周期偏移问题。第4行应用 exponential\_smoothing 函数实现指数平滑处理，输出最终压力值。
 
 算法\ref{alg:calculate_weighted_pressure_time}实现了多核加权聚合。第3行是该算法的核心，它通过回收时间增量与工作时间增量的乘积累加，实现了公式\ref{eq:weighted_aggregation}中的权重聚合，避免了空闲核心的稀释效应。这种实现方式优于显式维护权重数组的方法，具有更高的计算效率。第4行累加工作时间增量，为后续计算压力百分比提供分母。
-
-算法\ref{alg:update_timestamps}处理采样时间管理。第1-2行检查是否达到下次更新时间，避免过早执行。第3行根据公式\ref{eq:missed_periods}计算错过的周期数。第4行应用公式\ref{eq:next_execution}更新下次执行时刻，保持采样相位一致性，防止时间偏移累积。这种相位校准机制确保了即使在系统负载波动时，内存压力监测依然能保持连续稳定的采样节奏。
-算法\ref{alg:exponential_smoothing}实现了指数平滑处理。第1-2行计算并限制样本时间，应用\ref{sec:time_calibration_and_data_processing}节提出的截断补偿机制。第4行将样本时间转换为百分比并用定点数表示，实现\ref{sec:fixed_point_optimization}节的定点数优化。第5-6行处理连续多个周期未更新的情况，使用fixed\_power\_int函数实现指数加速收敛。第7行使用指数加权公式计算新的内存压力值，定点数表示的exp和$(2^{10}-\text{exp})$分别对应公式\ref{eq:EMA}中的\(\alpha\)和\((1-\alpha)\)。第8-9行是工程优化，在压力下降时进行微调，提高系统对压力缓解的响应性。
 \SetKwFunction{FixedPowerInt}{fixed\_power\_int}
 \SetKwProg{Fn}{Function}{:}{}
-算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
-
 \begin{algorithm}[htb]
     \caption{fixed\_power\_int}
     \label{alg:helper_functions}
@@ -571,6 +611,11 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
         \Return \(result\)\;
     }
 \end{algorithm}
+
+算法\ref{alg:update_timestamps}处理采样时间管理。第1-2行检查是否达到下次更新时间，避免过早执行。第3行根据公式\ref{eq:missed_periods}计算错过的周期数。第4行应用公式\ref{eq:next_execution}更新下次执行时刻，保持采样相位一致性，防止时间偏移累积。这种相位校准机制确保了即使在系统负载波动时，内存压力监测依然能保持连续稳定的采样节奏。
+算法\ref{alg:exponential_smoothing}实现了指数平滑处理。第1-2行计算并限制样本时间，应用\ref{sec:time_calibration_and_data_processing}节提出的截断补偿机制。第4行将样本时间转换为百分比并用定点数表示，实现\ref{sec:fixed_point_optimization}节的定点数优化。第5-6行处理连续多个周期未更新的情况，使用fixed\_power\_int函数实现指数加速收敛。第7行使用指数加权公式计算新的内存压力值，定点数表示的exp和$(2^{10}-\text{exp})$分别对应公式\ref{eq:EMA}中的\(\alpha\)和\((1-\alpha)\)。第8-9行是工程优化，在压力下降时进行微调，提高系统对压力缓解的响应性。
+算法\ref{alg:helper_functions}实现了定点数快速幂计算。第2行初始化结果为定点数的1.0。第3-11行实现二进制快速幂算法，时间复杂度为$O(\log n)$。第6行和第9行中的$(expr + 2^9) \gg 10$操作实现了定点数乘法中的四舍五入，确保计算精度。
+
 
 
 

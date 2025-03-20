@@ -66,8 +66,13 @@
 
 
             % 插入封面 (假设封面 PDF 文件名为 cover.pdf，位于 misc 子目录下)
-\IfFileExists{misc/电子科技大学研究生学位论文封面及扉页.pdf}{%
-\includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页.pdf}
+% \IfFileExists{misc/电子科技大学研究生学位论文封面及扉页.pdf}{%
+% \includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页.pdf}
+% }{%
+% \PackageError{mypackage}{File not found}{The cover PDF file was not found.}%如果没找到文件,报错
+% }
+\IfFileExists{misc/电子科技大学研究生学位论文封面及扉页-送审.pdf}{%
+\includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页-送审.pdf}
 }{%
 \PackageError{mypackage}{File not found}{The cover PDF file was not found.}%如果没找到文件,报错
 }
