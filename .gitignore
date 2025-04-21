@@ -16,6 +16,7 @@
 !./example.pdf
 *.pdf
 !pic/*.pdf
+!misc/*.pdf
 .DS_Store
 .specstory
 tmp/

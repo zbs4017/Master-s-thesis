@@ -40,7 +40,7 @@
 \section{基于同步内存回收延迟的内存压力量化算法}
 \label{sec:基于同步内存回收延迟的内存压力量化算法}
 
-在 \ref{sec:Linux内存回收机制} 节中，已经对 Linux 内核同步内存回收机制做了详细的分析，分析表明，函数 \_\_alloc\_pages\_direct\_reclaim 的执行时间是反映同步回收延迟的重要指标。基于此本节提出了一种内存压力检测方法。该方法利用内核插桩技术，在 \_\_alloc\_pages\_direct\_reclaim 函数的入口和出口处改变状态，然后在内核中每次发生同步中断的时候去更新累计时间和CPU的非空闲时间，从而直接获取每次同步回收操作的耗时。为了综合反映多  CPU  系统中不同核心的负载差异，本研究引入了多  CPU  加权聚合策略。此外，为了平滑压力数据、减少短期波动的影响，本研究采用了指数移动平均算法。此外，还采用了定点数优化技术，显著提高了计算效率。
+在 \ref{sec:Linux内存回收机制} 节中，已经对 Linux 内核同步内存回收机制做了详细的分析，分析表明，函数 \_\_alloc\_pages\_direct\_reclaim 的执行时间是反映同步回收延迟的重要指标。基于此本节提出了一种内存压力检测方法。该方法利用内核插桩技术，在 \_\_alloc\_pages\_direct\_reclaim 函数的入口和出口处改变状态，然后在内核中每次发生同步中断的时候去更新累计时间和CPU的非空闲时间，从而直接获取每次同步回收操作的耗时。为了综合反映多 CPU 系统中不同核心的负载差异，本研究引入了多 CPU 加权聚合策略。此外，为了平滑压力数据、减少短期波动的影响，本研究采用了指数移动平均算法。此外，还采用了定点数优化技术，显著提高了计算效率。
 
 \subsection{多核加权聚合}
 \label{sec:weighted_aggregation}
@@ -52,7 +52,7 @@
 
 其中，\(\Delta T\) 为采样周期，\(n\) 为处理器核心数量，简单平均算法在多核系统中存在两个关键理论缺陷，影响其准确表征系统内存压力的能力。
 
-首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应（idle core dilution effect）。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞（均为0秒），则系统压力计算结果为：
+首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞（均为0秒），则系统压力计算结果为：
 \[
 Pressure_{simple} = \frac{0.5 + 0.1 + 0 + 0}{1.0 \times 4} \times 100\% = 15\%
 \]
@@ -111,7 +111,7 @@ Pressure_{weighted} = \frac{60 \times 90 + 10 \times 20}{90 + 20} \times 100\% =
 
 \subsection{指数移动平均算法}
 \label{sec:exponential_smoothing}
-在获取基于处理器核心的非空闲时间加权的内存压力指标后，本研究进一步考虑压力数据的平滑性以及长期趋势的分析。原始的压力数据（无论是简单平均还是加权平均）可能会因为短暂的、偶然的事件而产生剧烈波动，这些波动可能会掩盖真实的压力趋势。因此，需要采用一种有效的方法对压力数据进行平滑处理，以减少短期波动的影响，同时保留长期趋势信息。指数移动平均（Exponential Moving Average, EMA）算法\citing{gardner1985exponential}在多个方面优于传统平滑方法：首先，相较于简单移动平均（SMA），EMA能更快地响应压力变化；其次，与加权移动平均（WMA）相比，EMA的计算效率更高且内存占用更小；最后，相比于Kalman滤波等复杂算法，EMA具有参数调整简单、计算开销低等优势，特别适合资源受限的实时操作系统环境。
+在获取基于处理器核心的非空闲时间加权的内存压力指标后，本研究进一步考虑压力数据的平滑性以及长期趋势的分析。原始的压力数据（无论是简单平均还是加权平均）可能会因为短暂的、偶然的事件而产生剧烈波动，这些波动可能会掩盖真实的压力趋势。因此，需要采用一种有效的方法对压力数据进行平滑处理，以减少短期波动的影响，同时保留长期趋势信息。指数移动平均（Exponential Moving Average, EMA）算法\citing{gardner1985exponential}在多个方面优于传统平滑方法：首先，相较于简单移动平均，EMA能更快地响应压力变化；其次，与加权移动平均相比，EMA的计算效率更高且内存占用更小；最后，相比于卡尔曼滤波等复杂算法，EMA具有参数调整简单、计算开销低等优势，特别适合资源受限的实时操作系统环境。
 
 EMA 算法的核心思想是对新旧数据进行加权平均，但与简单算术平均赋予所有数据相同权重不同，EMA 赋予旧数据的影响随时间推移呈指数衰减。这种处理方式更符合实际系统的运行特征：最近发生的事件对当前系统状态的影响通常更大，而较早发生的事件的影响则逐渐减弱。具体来说，EMA 的计算公式为：
 \begin{equation}
@@ -211,7 +211,7 @@ v_{\text{current}} = \min(v, \textit{period}), \quad v_{\text{carryover}} = v - 
             result \(\gets\) result \(\times\) x\;  \tcp*{Multiply result by current power of x}
         }
         x \(\gets x \times x\)\;  \tcp*{Square x for next iteration}
-        n \(\gets n \gg 1\)\;  \tcp*{Right shift n (equivalent to $\lfloor n/2 \rfloor$)}
+        n \(\gets n \gg 1\)\;  \tcp*{Right shift n (equivalent to \(\lfloor n/2 \rfloor\))}
     }
     \Return result\;
 \end{algorithm}
@@ -263,7 +263,7 @@ R' = \frac{D}{F}
 
 为全面评估定点数在实际计算过程中的误差传播特性，本节分析加减法和乘法两类基本运算的累积误差。
 
-\paragraph{加减法误差分析}\quad 
+\paragraph{加减法误差分析}\quad
 令实数$R_1$和$R_2$分别被量化为定点数$D_1$和$D_2$，根据量化误差定义，有：
 \begin{equation}
 |R_1 - \frac{D_1}{F}| \leq \frac{1}{F} \quad \text{和} \quad |R_2 - \frac{D_2}{F}| \leq \frac{1}{F}
@@ -278,7 +278,7 @@ R' = \frac{D}{F}
 \end{aligned}
 \end{equation}
 
-如果将加减法结果再次量化为定点数，可能引入额外的舍入误差，最多为$\frac{1}{F}$。因此，一次加减法操作后再量化的总误差上界为$\frac{3}{F} = 3 \times 2^{-10} \approx 0.002930$，仍然保持在可接受的精度范围内。
+如果将加减法结果再次量化为定点数，可能引入额外的舍入误差，最多为$\frac{1}{F}$。因此，一次加减法操作后再量化的总误差上界为\(\frac{3}{F} = 3 \times 2^{-10} \approx 0.002930\)，仍然保持在可接受的精度范围内。
 
 在实际实现中，本文采用了误差优化策略：多次连续加减运算只在最终结果上执行一次量化，而非每步操作后都进行量化。这种策略显著减少了中间结果的反复舍入，将$n$次操作的累积误差从最坏情况的$\frac{2n+1}{F}$降低至$\frac{n+1}{F}$。
 
@@ -325,47 +325,6 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 虽然理论误差上界约为 $0.002930$，在极端情况下可能接近 $0.02$，但实际应用中，特别是在内存压力计算等场景下，由于乘数通常为较小的值，例如公式 \eqref{eq:EMA} 中的指数衰减因子 $\alpha$，实际误差通常远低于理论上界，并维持在 $2^{-9}$（约 $0.002$）量级，能够满足系统对精度的要求。
 
-
-
-
-% \paragraph{乘法运算的定点误差分析}
-% 定点数乘法会引入误差，主要来源于输入量化和结果量化两个阶段。为了分析这些误差，我们首先回顾定点数乘法的计算过程。对于实数 $R_1$ 和 $R_2$，它们首先被量化为定点数 $D_1 = R_1 \cdot F$ 和 $D_2 = R_2 \cdot F$，其中 $F$ 是比例因子（对于 Q0.10 格式，$F=2^{10}$）。定点数乘法的计算过程可以表示为：
-% \begin{equation}
-% D_1 \times D_2 = (R_1 \cdot F) \times (R_2 \cdot F) = (R_1 \times R_2) \cdot F^2
-% \end{equation}
-
-% 由于输出需要保持 Q0.10 格式，需要进行右移操作，即除以 $F$ 并向下取整：
-% \begin{equation}
-% (D_1 \times D_2) \gg 10 = \lfloor \frac{D_1 \times D_2}{F} \rfloor = \lfloor (R_1 \times R_2) \cdot F \rfloor
-% \end{equation}
-
-% 输入量化误差分析： 假设量化过程引入了误差，使得 $R_1 = \frac{D_1}{F} + \epsilon_1$ 和 $R_2 = \frac{D_2}{F} + \epsilon_2$，其中 $|\epsilon_1|, |\epsilon_2| \leq \frac{1}{F}$ 代表量化误差的界限。将带有误差的定点数表示代入乘法运算，得到：
-% \[
-% \begin{aligned}
-% R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
-% &= \frac{D_1 \times D_2}{F^2} + \frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2
-% \end{aligned}
-% \]
-
-% 公式展开后，除了理想的 $\frac{D_1 \times D_2}{F^2}$ 项，还包含了由于输入量化误差产生的额外项。考虑到 $|D_1|, |D_2| \leq F$ 以及 $|\epsilon_1|, |\epsilon_2| \leq \frac{1}{F}$，输入误差传播的上界可以估计为：
-% \begin{equation}
-% \begin{aligned}
-% |\frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2| &\leq \frac{|D_1| |\epsilon_2|}{F} + \frac{|D_2| |\epsilon_1|}{F} + |\epsilon_1| |\epsilon_2| \\
-% &\leq \frac{F \times (1/F)}{F} + \frac{F \times (1/F)}{F} + (\frac{1}{F}) \times (\frac{1}{F}) \\
-% &= \frac{2}{F} + \frac{1}{F^2}
-% \end{aligned}
-% \end{equation}
-
-% 当 $F = 2^{10}$ 时，$\frac{1}{F^2}$ 项非常小可以忽略，因此输入量化误差传播的上界近似为 $\frac{2}{F}$。
-
-% 结果量化误差分析： 乘法结果右移操作，即公式 (2) 中的 $\lfloor \frac{D_1 \times D_2}{F} \rfloor$，会引入舍入误差，其误差上界为 $\frac{1}{F}$。
-
-% 总误差分析： 综合输入量化误差和结果量化误差，定点数乘法运算的总误差上界 $\epsilon_{mul}$ 为两者之和：
-% \begin{equation}
-% |\epsilon_{mul}| \leq (\frac{2}{F} + \frac{1}{F^2}) + \frac{1}{F} = \frac{3}{F} + \frac{1}{F^2} \approx \frac{3}{F} = \frac{3}{2^{10}} \approx 0.002930
-% \end{equation}
-
-% 虽然理论误差上界约为 $0.002930$，在极端情况下可能接近 $0.02$，但实际应用中，特别是在内存压力计算等场景下，由于乘数通常为较小的值，例如公式 \eqref{eq:EMA} 中的指数衰减因子 $\alpha$，实际误差通常远低于理论上界，并维持在 $2^{-9}$（约 $0.002$）量级，能够满足系统对精度的要求。
 
 \section{基于同步回收延迟的内存压力量化实现}
 \label{sec:基于同步回收延迟的内存压力量化实现}
@@ -428,7 +387,6 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 若in\_direct\_reclaim为假，则表明当前CPU未处于直接内存回收状态。此时，系统会计算时间差（now - time），并将其累加到total\_work\_time变量中，用于统计CPU在工作状态下的时间消耗。无论in\_direct\_reclaim的真假，流程最终都会汇聚至结束节点，完成一次时钟中断的处理。
 
-
 此外，在进程切换时，系统会检查task\_struct中的in\_mem\_mempressure标志。如果当前进程的in\_mem\_mempressure为true，则表明该进程涉及内存压力，此时需要修改Per-CPU变量中的in\_direct\_reclaim标志，以表示当前CPU不再花费时间进行同步内存回收。反之，如果要切换进来的进程的in\_mem\_mempressure为true，则需要将Per-CPU变量中的in\_direct\_reclaim标志设置为true，表示当前CPU需要花费时间进行同步内存回收。
 
 \subsection{消费者实现与并发安全保障}
@@ -467,12 +425,12 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{seqlock.pdf}
-    \caption{序列锁（Seqlock）原理示意图}
+    \caption{序列锁原理示意图}
     \label{fig:seqlock}
 \end{figure}
 在生产者消费者模型中，生产者负责采集内存回收过程中的累积时间，而消费者（工作队列）则负责处理这些数据，计算并输出内存压力指标。为了确保数据在并发环境下的完整性和一致性，同时兼顾性能，需要对临界区进行精细的保护。
 
-在详细阐述临界区保护策略之前，有必要先介绍本研究所采用的核心同步机制：序列锁（Seqlock）。序列锁是 Linux 内核提供的一种轻量级同步原语，特别适用于读多写少且写操作简短的场景。其基本原理如图 \ref{fig:seqlock} 所示。序列锁维护一个序列计数器，写操作通过递增该计数器来标识数据更新的开始和结束（奇数表示写操作进行中，偶数表示无写操作）。读操作在开始时记录序列号 read\_seqbegin()，并在读取完成后再次检查序列号 read\_seqretry()。如果序列号发生变化，则表明在读取过程中发生了写操作，读操作需要重试，以确保读取到一致的数据。
+在详细阐述临界区保护策略之前，有必要先介绍本研究所采用的核心同步机制：序列锁。序列锁是 Linux 内核提供的一种轻量级同步原语，特别适用于读多写少且写操作简短的场景。其基本原理如图 \ref{fig:seqlock} 所示。序列锁维护一个序列计数器，写操作通过递增该计数器来标识数据更新的开始和结束（奇数表示写操作进行中，偶数表示无写操作）。读操作在开始时记录序列号 read\_seqbegin()，并在读取完成后再次检查序列号 read\_seqretry()。如果序列号发生变化，则表明在读取过程中发生了写操作，读操作需要重试，以确保读取到一致的数据。
 
 
 在本研究中，需要重点保护的临界区主要包括以下三类：
@@ -488,7 +446,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
             \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev}\),
             \(\text{mem\_pressure\_prev}, \text{next\_update\_time}, \text{last\_update\_time}, T, \text{exp}\);
     }
-    \Output{updated 
+    \Output{updated
          \(\text{mem\_pressure\_prev}, \text{mem\_pressure\_time\_prev},\)
          \(\text{next\_update\_time}, \text{last\_update\_time}\)}
 
@@ -527,7 +485,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
     }
     \Return{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
     \end{algorithm}
-而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁（Mutex）保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
+而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
 \begin{algorithm}[H]
         \caption{update\_timestamps}
         \label{alg:update_timestamps}
