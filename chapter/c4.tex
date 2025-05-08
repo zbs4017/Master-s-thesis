@@ -26,12 +26,12 @@
 \begin{enumerate}
     \item 当系统内存充足时，同步回收操作极少发生，\(T_{sync}\) 接近于零；
     \item 当内存压力逐渐增加时，\(T_{sync}\) 呈现出与压力程度近似线性的增长；
-    \item 对于异构存储后端，高性能设备（如NVM）处理同等数量的缺页中断所需时间更短，计算得到的内存压力值也相应较低，准确反映了实际系统状态。
+    \item 对于异构存储后端，高性能设备处理同等数量的缺页中断所需时间更短，计算得到的内存压力值也相应较低，准确反映了实际系统状态。
 \end{enumerate}
 
 该方法直接测量因内存压力导致的性能损失时间，而非间接指标。同步内存回收发生时，应用程序必然被阻塞，这部分时间的占比直接反映了应用因内存不足而遭受的性能损失，建立了内存压力与性能影响之间的直接联系。
 
-在异构卸载环境中，该方法能够自动适应不同存储后端的性能特性。对于高性能卸载后端（如NVM或Optane），即使发生相同次数的缺页中断，由于其处理速度更快，测得的同步回收时间会相应减少，从而体现出较低的内存压力值；而对于传统机械硬盘，相同次数的缺页中断会导致更长的回收时间，反映出更高的性能损失和内存压力。这种适应性消除了传统方法中需要为不同存储设备单独调整评估参数的复杂性。
+在异构卸载环境中，该方法能够自动适应不同存储后端的性能特性。对于高性能卸载后端，即使发生相同次数的缺页中断，由于其处理速度更快，测得的同步回收时间会相应减少，从而体现出较低的内存压力值；而对于传统机械硬盘，相同次数的缺页中断会导致更长的回收时间，反映出更高的性能损失和内存压力。这种适应性消除了传统方法中需要为不同存储设备单独调整评估参数的复杂性。
 
 无论应用程序是内存密集型、计算密集型还是I/O密集型，当内存不足导致性能下降时，都会表现为同步回收时间的增加。这使得该方法能够在不同类型的工作负载下保持一致的评估标准，无需针对特定应用类型进行定制化调整。
 
@@ -52,7 +52,7 @@
 
 其中，\(\Delta T\) 为采样周期，\(n\) 为处理器核心数量，简单平均算法在多核系统中存在两个关键理论缺陷，影响其准确表征系统内存压力的能力。
 
-首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞（均为0秒），则系统压力计算结果为：
+首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞，则系统压力计算结果为：
 \[
 Pressure_{simple} = \frac{0.5 + 0.1 + 0 + 0}{1.0 \times 4} \times 100\% = 15\%
 \]
@@ -149,10 +149,8 @@ t_0, \quad t_0 + T + \Delta_1, \quad t_0 + 2T + \sum_{i=1}^2\Delta_i, \quad \dot
 
 这种时间偏移若不加处理，会导致采样间隔不均，影响内存压力的准确评估。为解决此问题，本研究设计了基于相位同步的时间校准算法。该算法通过定义两个关键参数实现：
 \begin{align}
-    \text{missed\_periods} &= \left\lfloor \frac{\text{now} - \text{expires}}{T} \right\rfloor
-    \label{eq:missed_periods} \\
-    \text{next\_execution} &= \text{expires} + (\text{missed\_periods} + 1) \times T
-    \label{eq:next_execution}
+    \mathit{missed\_periods} &= \left\lfloor \frac{\mathit{now} - \mathit{expires}}{T} \right\rfloor \label{eq:missed_periods} \\
+    \mathit{next\_execution} &= \mathit{expires} + (\mathit{missed\_periods} + 1) \times T \label{eq:next_execution}
 \end{align}
 
 式中，\(\text{now}\)表示当前系统时间戳，\(\text{expires}\)表示上次任务完成时刻。算法首先通过公式\ref{eq:missed_periods}计算当前已错过的完整周期数，然后利用公式\ref{eq:next_execution}确定下次执行时刻，将其映射至最近的理想时间点。这种方法不仅修正了当前周期的偏移，更重要的是通过全局时间重映射，有效抑制了时序偏移的级联传播，确保长期运行时的稳定性。
@@ -163,17 +161,17 @@ t_0, \quad t_0 + T + \Delta_1, \quad t_0 + 2T + \sum_{i=1}^2\Delta_i, \quad \dot
 
 \paragraph{截断补偿机制} \quad 在无锁采样环境下，时间记录机制存在固有的竞态条件，可能导致某一周期内记录的时间增量溢出至下一周期。特别是在系统承受持续高压力时，单个周期内累积的时间样本可能超过周期本身的长度，产生超过100\%的非物理压力值。
 
-设当前采样周期长度为\(\textit{period}\)，对于任一周期内检测到的累积同步回收时间\(v\)，当\(v > \textit{period}\)时，系统执行如下处理：
+设当前采样周期长度为\(period\)，对于任一周期内检测到的累积同步回收时间\(v\)，当\(v > \textit{period}\)时，系统执行如下处理：
 \begin{equation}
-v_{\text{current}} = \min(v, \textit{period}), \quad v_{\text{carryover}} = v - v_{\text{current}}
+v_{current} = \min(v, \textit{period}), \quad v_{carryover} = v - v_{current}
 \end{equation}
-其中，\(v_{\text{current}}\)表示当前周期内实际统计的有效累积时间，\(v_{\text{carryover}}\)表示超出阈值的剩余时间，将被递延至下一统计周期处理。
+其中，\(v_{current}\)表示当前周期内实际统计的有效累积时间，\(v_{carryover}\)表示超出阈值的剩余时间，将被递延至下一统计周期处理。
 
 该机制基于以下理论保证：
 \begin{enumerate}
     \item 总量守恒原理：截断补偿确保所有记录的时间增量都被计入统计，满足任意连续\(n\)个周期的累积等式：
     \begin{equation}
-        \sum_{k=1}^n v_{\text{current}}^{(k)} \equiv \sum_{k=1}^n v^{(k)}
+        \sum_{k=1}^n v_{current}^{(k)} \equiv \sum_{k=1}^n v^{(k)}
     \end{equation}
     \item 误差非累积性：当时间增量从周期\(P\)溢出至周期\(P+1\)时，根据时间守恒原理，它必然在周期\(P\)中释放了等量的时间，使得误差不会随时间累积。
     \item 时间序列同态性：该机制对原始压力曲线进行了时间保持型变换，延迟报告但不改变曲线的积分特性，确保长期评估的准确性。
@@ -181,18 +179,18 @@ v_{\text{current}} = \min(v, \textit{period}), \quad v_{\text{carryover}} = v - 
 
 \paragraph{指数加速收敛} \quad 当系统连续多个周期未能进行数据更新时，标准的指数移动平均(EMA)算法需要进行适应性调整。回顾公式\ref{eq:EMA}中的标准EMA更新公式：
 \begin{equation}
-    \text{EMA}_{new} = \alpha \cdot \text{EMA}_{old} + (1-\alpha) \cdot \text{Sample}_{current}
+    EMA_{new} = \alpha \cdot EMA_{old} + (1-\alpha) \cdot Sample_{current}
 \end{equation}
 
 当系统连续\(n\)个周期未更新时，需要从时刻\(t\)直接推进至时刻\(t+n\)。通过数学归纳法，可以推导此情况下的一般形式：
 \begin{equation}
-\text{EMA}(t+n) = \alpha^n \cdot \text{EMA}(t) + \sum_{k=1}^{n} \alpha^{n-k} \cdot (1-\alpha) \cdot \text{Sample}(t+k)
+EMA(t+n) = \alpha^n \cdot EMA(t) + \sum_{k=1}^{n} \alpha^{n-k} \cdot (1-\alpha) \cdot Sample(t+k)
 \end{equation}
 
-在实际情境中，若连续\(n-1\)个周期无数据更新，仅在第\(n\)个周期获得新样本\(\text{Sample}(t+n)\)，则中间缺失的样本值可视为零，上式简化为：
+在实际情境中，若连续\(n-1\)个周期无数据更新，仅在第\(n\)个周期获得新样本\(Sample(t+n)\)，则中间缺失的样本值可视为零，上式简化为：
 \begin{equation}
 \label{eq:EMA_2}
-\text{EMA}(t+n) = \alpha^n \cdot \text{EMA}(t) + (1-\alpha) \cdot \text{Sample}(t+n)
+EMA(t+n) = \alpha^n \cdot EMA(t) + (1-\alpha) \cdot Sample(t+n)
 \end{equation}
 
 式(\ref{eq:EMA_2})中的\(\alpha^n\)项在\(n\)较大时计算开销显著。为提高效率，本文采用二进制快速幂算法实现：
@@ -354,15 +352,10 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
         \toprule
         成员名称& 数据类型     & 描述                                        \\ \midrule
         in\_direct\_reclaim & bool & 当前CPU是否处于同步内存回收状态\\
-        \midrule
         time & u32 & 上一次累积时间的时间戳\\
-        \midrule
         total\_time &u32&当前CPU处于同步内存回收状态的累积时间\\
-        \midrule
         total\_time\_prev&u32&上一次统计时CPU处于同步内存回收状态的累积时间\\
-        \midrule
         total\_work\_time&u32&当前CPU处于工作状态的累积时间\\
-        \midrule
         total\_work\_time\_prev&u32&上一次统计时CPU处于工作状态的累积时间\\
         \bottomrule
     \end{tabular}
