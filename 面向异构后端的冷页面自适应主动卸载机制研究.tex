@@ -71,12 +71,12 @@
 % }{%
 % \PackageError{mypackage}{File not found}{The cover PDF file was not found.}%如果没找到文件,报错
 % }
-\IfFileExists{misc/电子科技大学研究生学位论文封面及扉页-送审.pdf}{%
-\includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页-送审.pdf}
+\IfFileExists{misc/电子科技大学研究生学位论文封面及扉页.pdf}{%
+\includepdf[pages=-, pagecommand={\thispagestyle{empty}}]{misc/电子科技大学研究生学位论文封面及扉页.pdf}
 }{%
 \PackageError{mypackage}{File not found}{The cover PDF file was not found.}%如果没找到文件,报错
 }
-
+\signatureofdeclaration{misc/独创性声明.pdf}
 % This is a template of mutiple files.
 % The folders chapters/ and misc/ have the related files
 

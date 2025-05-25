@@ -1,10 +1,10 @@
-\chapter{基于同步内存回收的内存压力量化算法的设计与实现}
+\chapter{基于同步回收的内存压力量化算法}
 \label{chap:基于同步内存回收的内存压力量化算法的设计与实现}
 本章详细介绍了基于同步内存回收延迟的内存压力量化算法的设计与实现细节。首先分析了同步回收延迟与内存压力的关联性，然后提出了基于同步回收延迟的内存压力量化算法的设计思想，关键技术细节，最后介绍了该算法的实现细节。
 
 \section{同步内存回收延迟与内存压力的关联性建模}
 
-在内存管理研究中，工作集估计算法作为核心组件，其精确性直接影响内存分配策略与页面置换决策的效能。如\ref{sec:工作集估计算法研究历史与现状}节所述，现有工作集估计方法可归纳为三类典型范式：基于统计采样的近似计算模型、依托系统运行时特征的启发式预测算法，以及基于机器学习模型的离线训练-在线预测框架。然而，机器学习算法在面对新型应用场景时存在泛化能力不足的问题，其预测性能有待进一步验证。
+在内存管理研究中，工作集估计算法作为核心组件，其精确性直接影响内存分配策略与页面置换决策的效能。如第\ref{sec:工作集估计算法研究历史与现状}节所述，现有工作集估计方法可归纳为三类典型范式：基于统计采样的近似计算模型、依托系统运行时特征的启发式预测算法，以及基于机器学习模型的离线训练-在线预测框架。然而，机器学习算法在面对新型应用场景时存在泛化能力不足的问题，其预测性能有待进一步验证。
 
 基于统计特征的启发式算法在内存管理领域被广泛应用，原因在于它们能够实时适应系统运行状态的变化，满足动态内存管理的需求。在这类算法中，内存压力指标是一个核心概念，它量化了系统内存资源的紧张程度，为内存卸载决策提供了重要依据。现有研究通常采用缺页中断频率、页面分配速率等多种统计指标来表征内存压力，并通过这些指标来估计工作集大小。然而，这些传统方法存在两个关键缺陷：
 
@@ -37,7 +37,7 @@
 
 基于上述理论分析，下一节将详细介绍如何设计和实现基于同步内存回收延迟的内存压力量化算法，包括多核系统中的加权聚合策略、指数移动平均平滑处理以及定点数优化技术。
 
-\section{基于同步内存回收延迟的内存压力量化算法}
+\section{内存压力量化算法设计}
 \label{sec:基于同步内存回收延迟的内存压力量化算法}
 
 在 \ref{sec:Linux内存回收机制} 节中，已经对 Linux 内核同步内存回收机制做了详细的分析，分析表明，函数 \_\_alloc\_pages\_direct\_reclaim 的执行时间是反映同步回收延迟的重要指标。基于此本节提出了一种内存压力检测方法。该方法利用内核插桩技术，在 \_\_alloc\_pages\_direct\_reclaim 函数的入口和出口处改变状态，然后在内核中每次发生同步中断的时候去更新累计时间和CPU的非空闲时间，从而直接获取每次同步回收操作的耗时。为了综合反映多 CPU 系统中不同核心的负载差异，本研究引入了多 CPU 加权聚合策略。此外，为了平滑压力数据、减少短期波动的影响，本研究采用了指数移动平均算法。此外，还采用了定点数优化技术，显著提高了计算效率。
@@ -50,16 +50,9 @@
     Pressure_{simple} = \frac{\sum_{c=1}^{n} T_c^{block}}{\Delta T \times n} \times 100\%
 \end{equation}
 
-其中，\(\Delta T\) 为采样周期，\(n\) 为处理器核心数量，简单平均算法在多核系统中存在两个关键理论缺陷，影响其准确表征系统内存压力的能力。
+其中，\(\Delta T\) 为采样周期，\(n\) 为处理器核心数量，简单平均算法在多核系统中存在关键理论缺陷，影响其准确表征系统内存压力的能力。
 
-首先，简单平均算法忽略了处理器核心间负载分布的不均衡性，导致所谓的空闲核心稀释效应。在异构负载环境中，当少数核心承担主要计算任务而其他核心相对空闲时，高负载核心所反映的内存压力信号会被空闲核心的数据稀释。以四核系统为例，若其中一个高负载核心记录了0.5秒的同步回收阻塞时间，一个轻负载核心记录了0.1秒，而其余两个核心几乎无阻塞，则系统压力计算结果为：
-\[
-Pressure_{simple} = \frac{0.5 + 0.1 + 0 + 0}{1.0 \times 4} \times 100\% = 15\%
-\]
-
-此结果明显低估了系统实际承受的内存压力，因为对于执行关键任务的处理器核心而言，50\%的时间（0.5秒/1.0秒）被阻塞在内存回收操作上，这种严重的资源受限状态在平均计算中被显著弱化。
-
-其次，简单平均算法对所有核心赋予等价权重，未能反映不同核心在系统整体性能中的贡献差异。在工作负载不均衡的场景下，主要完成计算任务的核心对系统性能的影响更为显著。考虑一个双核系统，\(\Delta T\) 为100ms。核心0处于高负载状态，非空闲时间为90ms（占总时间的90\%用于处理任务），其中60ms用于同步内存回收，30ms用于处理其他任务；而核心1基本处于轻负载状态，非空闲时间仅20ms（占总时间的20\%），其中10ms用于同步内存回收，10ms用于处理其他任务。简单平均算法计算得出的系统压力为：
+简单平均算法对所有核心赋予等价权重，未能反映不同核心在系统整体性能中的贡献差异。在工作负载不均衡的场景下，主要完成计算任务的核心对系统性能的影响更为显著。考虑一个双核系统，\(\Delta T\) 为100ms。核心0处于高负载状态，非空闲时间为90ms（占总时间的90\%用于处理任务），其中60ms用于同步内存回收，30ms用于处理其他任务；而核心1基本处于轻负载状态，非空闲时间仅20ms（占总时间的20\%），其中10ms用于同步内存回收，10ms用于处理其他任务。简单平均算法计算得出的系统压力为：
 \[
 Pressure_{simple} = \frac{60 + 10}{100 \times 2} \times 100\% = 35\%
 \]
@@ -67,7 +60,6 @@ Pressure_{simple} = \frac{60 + 10}{100 \times 2} \times 100\% = 35\%
 这一结果未能反映核心0作为主要计算资源的压力状态，从而可能导致资源管理决策的偏差。
 
 为克服上述缺陷，本研究提出采用加权聚合算法，这种启发式方法借鉴了多领域中的贡献度加权思想\citing{Hwang1981MultipleAD}。类似的权重分配策略在计算机体系结构中的不对称多处理器调度\citing{petrucci2012lucky}中得到了广泛应用。该算法的核心思想是：根据每个处理器核心的运行时间分配权重。核心的运行时间越长，表明其在采样周期内处理的任务越多，其上发生的同步内存回收事件对系统整体性能的影响也越显著，其行为也更具有代表性。加权聚合算法的计算公式如下：
-
 \begin{equation}
     \label{eq:weighted_aggregation}
     Pressure_{weighted} = \frac{\sum_{c=1}^{n} (T_c^{block} \times W_c)}{\sum_{c=1}^{n} W_c} \times 100\%
@@ -177,7 +169,7 @@ v_{current} = \min(v, \textit{period}), \quad v_{carryover} = v - v_{current}
     \item 时间序列同态性：该机制对原始压力曲线进行了时间保持型变换，延迟报告但不改变曲线的积分特性，确保长期评估的准确性。
 \end{enumerate}
 
-\paragraph{指数加速收敛} \quad 当系统连续多个周期未能进行数据更新时，标准的指数移动平均(EMA)算法需要进行适应性调整。回顾公式\ref{eq:EMA}中的标准EMA更新公式：
+\paragraph{指数加速收敛} \quad 当系统连续多个周期未能进行数据更新时，标准的EMA算法需要进行适应性调整。回顾公式\ref{eq:EMA}中的标准EMA更新公式：
 \begin{equation}
     EMA_{new} = \alpha \cdot EMA_{old} + (1-\alpha) \cdot Sample_{current}
 \end{equation}
@@ -193,39 +185,34 @@ EMA(t+n) = \alpha^n \cdot EMA(t) + \sum_{k=1}^{n} \alpha^{n-k} \cdot (1-\alpha) 
 EMA(t+n) = \alpha^n \cdot EMA(t) + (1-\alpha) \cdot Sample(t+n)
 \end{equation}
 
-式(\ref{eq:EMA_2})中的\(\alpha^n\)项在\(n\)较大时计算开销显著。为提高效率，本文采用二进制快速幂算法实现：
-
-\begin{algorithm}[htbp]
-    \caption{Binary Exponentiation for EMA Acceleration}
-    \label{alg:fast_exp}
-    \SetAlgoLined
-    
-    \KwIn{\(x\): base value (real or integer), \(n\): exponent (non-negative integer)}
-    \KwOut{\(x^n\): computed power}
-    
-    result \(\gets 1\)\;
-    \While{$n > 0$}{
-        \If{$n \,AND\, 1 \neq 0$}{  \tcp*{Check if lowest bit is 1}
-            result \(\gets\) result \(\times\) x\;  \tcp*{Multiply result by current power of x}
-        }
-        x \(\gets x \times x\)\;  \tcp*{Square x for next iteration}
-        n \(\gets n \gg 1\)\;  \tcp*{Right shift n (equivalent to \(\lfloor n/2 \rfloor\))}
-    }
-    \Return result\;
-\end{algorithm}
-
-该算法通过将幂运算分解为平方运算和选择性乘法，利用指数的二进制表示实现计算优化。对于任意非负整数\(n\)的二进制表示：
+式(\ref{eq:EMA_2})中的\(\alpha^n\)项在\(n\)较大时计算开销显著。为提高效率，本文采用二进制快速幂算法实现。该算法通过将幂运算分解为平方运算和选择性乘法，利用指数的二进制表示实现计算优化。对于任意非负整数\(n\)的二进制表示：
 \begin{equation}
 n = (b_k b_{k-1} \ldots b_1 b_0)_2 = \sum_{i=0}^{k} b_i 2^i
 \end{equation}
-
 幂运算可重写为：
 \begin{equation}
 x^n = x^{\sum_{i=0}^{k} b_i 2^i} = \prod_{i=0}^k (x^{2^i})^{b_i}
 \end{equation}
 
 算法仅需检查\(n\)的每个二进制位，并选择性地将对应\(x\)的幂次项纳入结果，时间复杂度从\(O(n)\)降至\(O(\log n)\)，显著提升了系统在处理长期无更新场景时的计算效率。
+% \begin{algorithm}[htbp]
+%     \caption{Binary Exponentiation for EMA Acceleration}
+%     \label{alg:fast_exp}
+%     \SetAlgoLined
 
+%     \KwIn{\(x\): base value (real or integer), \(n\): exponent (non-negative integer)}
+%     \KwOut{\(x^n\): computed power}
+
+%     result \(\gets 1\)\;
+%     \While{$n > 0$}{
+%         \If{$n \,AND\, 1 \neq 0$}{  \tcp*{Check if lowest bit is 1}
+%             result \(\gets\) result \(\times\) x\;  \tcp*{Multiply result by current power of x}
+%         }
+%         x \(\gets x \times x\)\;  \tcp*{Square x for next iteration}
+%         n \(\gets n \gg 1\)\;  \tcp*{Right shift n (equivalent to \(\lfloor n/2 \rfloor\))}
+%     }
+%     \Return result\;
+% \end{algorithm}
 通过时间校准和数据处理优化机制的协同作用，系统能够在复杂多变的运行环境中保持对内存压力的准确监测，为内存管理决策提供可靠依据。
 
 
@@ -304,7 +291,8 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 &= \frac{D_1 \times D_2}{F^2} + \frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2
 \end{aligned}
 \]
-考虑到内存压力监测场景中，$R_1$和$R_2$通常为[0,1]范围内的百分比值或[0,1]范围内的指数衰减因子。 对于以Q0.10格式表示[0,1]范围实数，定点数的值范围为[0, $F$]，因此可设$|D_1|, |D_2| \leq F$。 则输入误差传播的上界为：
+考虑到内存压力监测场景中，$R_1$和$R_2$通常为[0,1]范围内的百分比值或[0,1]范围内的指数衰减因子。 对于以Q0.10格式表示[0,1]范围实数，定点数的值范围为[0, $F$]，因此可设\(|D_1|, |D_2| \leq F\)。 则输入误差传播的上界为：
+
 \begin{equation}
 \begin{aligned}
 |\frac{D_1 \times \epsilon_2}{F} + \frac{D_2 \times \epsilon_1}{F} + \epsilon_1 \times \epsilon_2| &\leq \frac{|D_1| |\epsilon_2|}{F} + \frac{|D_2| |\epsilon_1|}{F} + |\epsilon_1| |\epsilon_2| \\
@@ -333,7 +321,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 以下各小节将依次详述这些组件的实现细节：首先介绍整体系统架构及数据流；其次分析生产者的工作流程；然后阐述基于工作队列的消费者实现和临界区的保护策略；最后详解内存压力计算的核心算法实现。
 
-\subsection{基于生产者消费者模式的内存压力量化实现}
+\subsection{生产者–消费者模型整体框架}
 
 \begin{figure}[H]
     \centering
@@ -366,7 +354,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 消费者模块使用工作队列来实现，周期的从Per-CPU中读取读取，进行聚合，在\ref{sec:工作队列}介绍了选用工作队列的原因，在\ref{sec:内存压力计算算法}中介绍了详细的算法实现。
 
 
-\subsection{生产者工作流程}
+\subsection{生产者线程流程}
 
 \begin{figure}[htb]
     \centering
@@ -382,7 +370,7 @@ R_1 \times R_2 &= (\frac{D_1}{F} + \epsilon_1)(\frac{D_2}{F} + \epsilon_2) \\
 
 此外，在进程切换时，系统会检查task\_struct中的in\_mem\_mempressure标志。如果当前进程的in\_mem\_mempressure为true，则表明该进程涉及内存压力，此时需要修改Per-CPU变量中的in\_direct\_reclaim标志，以表示当前CPU不再花费时间进行同步内存回收。反之，如果要切换进来的进程的in\_mem\_mempressure为true，则需要将Per-CPU变量中的in\_direct\_reclaim标志设置为true，表示当前CPU需要花费时间进行同步内存回收。
 
-\subsection{消费者实现与并发安全保障}
+\subsection{消费者端并发安全}
 \label{sec:consumer_implementation}
 
 \subsubsection{基于工作队列的消费者实现}
@@ -428,6 +416,11 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
 
 在本研究中，需要重点保护的临界区主要包括以下三类：
 
+\begin{enumerate}
+    \item  Per-CPU 数据：每个 CPU 核心维护一份独立的数据结构，在表\ref{tab:sensor_data}中可以看到存储了CPU的统计信息。尽管 Per-CPU 变量在更新时本身具有原子性，无需额外加锁，但考虑到消费者需要读取所有 CPU 的 Per-CPU 数据进行聚合计算，因此仍需采取适当的同步措施。
+    \item 全局统计信息：一个全局静态变量，用于存储所有 CPU 停顿时间的累加值，以及用于平滑计算的历史统计数据。该变量的访问涉及多个 CPU 的数据聚合，因此需要严格的保护。
+    \item task\_struct->in\_mem\_mempressure 标志：task\_struct 中的一个标志位，用于标识当前进程是否涉及内存压力。该标志用于指导每次进程切换时，是否需要更新Per-CPU中的in\_direct\_reclaim标志。
+\end{enumerate}
 \begin{algorithm}[H]
     \caption{Memory Pressure Calculation}
     \label{alg:mem_pressure_optimized}
@@ -454,16 +447,11 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
     \qquad \(\text{mem\_pressure\_time}, \text{mem\_pressure\_time\_prev},\)
     \qquad \(\text{period}, \text{mem\_pressure\_prev}, \text{exp}, \text{missed})\)\;
 \end{algorithm}
-\begin{enumerate}
-    \item  Per-CPU 数据：每个 CPU 核心维护一份独立的数据结构，在表\ref{tab:sensor_data}中可以看到存储了CPU的统计信息。尽管 Per-CPU 变量在更新时本身具有原子性，无需额外加锁，但考虑到消费者需要读取所有 CPU 的 Per-CPU 数据进行聚合计算，因此仍需采取适当的同步措施。
-    \item 全局统计信息：一个全局静态变量，用于存储所有 CPU 停顿时间的累加值，以及用于平滑计算的历史统计数据。该变量的访问涉及多个 CPU 的数据聚合，因此需要严格的保护。
-    \item task\_struct->in\_mem\_mempressure 标志：task\_struct 中的一个标志位，用于标识当前进程是否涉及内存压力。该标志用于指导每次进程切换时，是否需要更新Per-CPU中的in\_direct\_reclaim标志。
-\end{enumerate}
-
 基于对这些数据结构特点和访问模式的深入分析，本研究采用了三种具有针对性的临界区保护策略，以平衡数据一致性与系统性能。
 
 对于Per-CPU数据中的累计时间，系统选择了序列锁保护机制。这一选择主要基于以下考量：首先，时钟中断处理函数需要频繁更新该数据，而中断处理程序不能被阻塞，序列锁恰好提供了无阻塞写入能力；其次，Per-CPU数据结构相对简单，多为32位或64位无符号整型，写操作（累加时间）执行快速，读取时可整体复制，这些特性与序列锁的适用条件高度吻合；此外，内存同步回收通常不是高频事件，对停顿时间的累加操作较少，构成典型的读多写少场景，这与序列锁的设计理念完全契合。
 
+而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
 \begin{algorithm}[H]
     \caption{calculate\_weighted\_pressure\_time}
     \label{alg:calculate_weighted_pressure_time}
@@ -477,8 +465,10 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
         \(\text{work\_time} \gets \text{work\_time} + (\text{total\_work\_time}_i - \text{total\_work\_time\_prev}_i)\)\;
     }
     \Return{\(\text{weight\_pressure\_time}, \text{work\_time}\)}
-    \end{algorithm}
-而对于全局统计信息，考虑到其操作复杂性和访问特点，本研究采用了互斥锁保护机制。互斥锁提供了更强的互斥性，适合保护涉及较长计算时间或复杂数据结构的操作。全局统计信息的更新需要聚合多个CPU的数据并进行历史数据的平滑计算，这些操作相对耗时且复杂。尽管互斥锁可能引入一定的性能开销，但由于全局统计信息的访问频率相对较低，通常只在消费者周期性执行时进行，因此这种开销在实际应用中处于可接受范围内。
+\end{algorithm}
+至于task\_struct中的in\_mem\_mempressure标志，系统采用了一种巧妙的隐式保护策略。该标志在同步内存回收开始时置位，结束时复位，这些操作通常发生在进程调度环境中。由于内核在操作过程中已持有相应CPU的运行队列锁并关闭本地中断，这自然形成了一道保护屏障，防止其它CPU或中断对当前进程的调度产生干扰。因此，在时钟中断处理函数中检查该标志时，运行队列锁的存在保证了当前进程不会被调度到其它CPU，使得直接访问该标志是安全的，无需引入额外的锁机制。这种复用已有同步原语的策略，不仅简化了系统设计，还有效降低了同步开销。
+
+总体而言，通过这三种针对性的临界区保护策略，本框架在确保数据一致性和完整性的前提下，最大限度地降低了同步开销，从而显著提升了系统的整体性能和响应能力。实验结果表明，这种差异化的保护策略在实际应用中表现出色，能够有效地平衡保护强度与性能开销之间的权衡。
 \begin{algorithm}[H]
         \caption{update\_timestamps}
         \label{alg:update_timestamps}
@@ -496,17 +486,13 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
         \Return{\(\text{next\_update\_time}, \text{last\_update\_time}, \text{missed}, \text{period}\)}
 \end{algorithm}
 
-至于task\_struct中的in\_mem\_mempressure标志，系统采用了一种巧妙的隐式保护策略。该标志在同步内存回收开始时置位，结束时复位，这些操作通常发生在进程调度环境中。由于内核在操作过程中已持有相应CPU的运行队列锁并关闭本地中断，这自然形成了一道保护屏障，防止其它CPU或中断对当前进程的调度产生干扰。因此，在时钟中断处理函数中检查该标志时，运行队列锁的存在保证了当前进程不会被调度到其它CPU，使得直接访问该标志是安全的，无需引入额外的锁机制。这种复用已有同步原语的策略，不仅简化了系统设计，还有效降低了同步开销。
 
-总体而言，通过这三种针对性的临界区保护策略，本框架在确保数据一致性和完整性的前提下，最大限度地降低了同步开销，从而显著提升了系统的整体性能和响应能力。实验结果表明，这种差异化的保护策略在实际应用中表现出色，能够有效地平衡保护强度与性能开销之间的权衡。
 
 \subsection{内存压力计算工程实现}
 \label{sec:内存压力计算算法}
 本节聚焦于内存压力量化算法的工程实现。基于\ref{sec:基于同步内存回收延迟的内存压力量化算法}的理论模型，本文设计了一套高效的算法体系，实现了从原始数据采集到最终压力指标输出的完整计算流程。核心实现遵循先聚合、再校准、后平滑的处理逻辑，同时采用定点数运算优化性能。
 
-
-
- \begin{algorithm}[htb]
+\begin{algorithm}[htb]
      \caption{exponential\_smoothing}
      \label{alg:exponential_smoothing}
      \SetAlgoLined
@@ -536,7 +522,7 @@ queue\_delayed\_work & 按指定周期调度监测任务 \\
      \Return{\(\text{mem\_pressure\_prev}\)}
  \end{algorithm}
 算法\ref{alg:mem_pressure_optimized}展示了内存压力计算的主流程。第1行调用\\
- calculate\_weighted\_pressure\_time 函数实现\ref{sec:weighted_aggregation}节提出的多核加权聚合模型。第2行将加权后的内存压力时间转换为百分比表示，同时通过max函数处理工作时间为零的边缘情况。第3行调用 update\_timestamps 函数实现时间校准机制，处理采样周期偏移问题。第4行应用 exponential\_smoothing 函数实现指数平滑处理，输出最终压力值。
+calculate\_weighted\_pressure\_time 函数实现\ref{sec:weighted_aggregation}节提出的多核加权聚合模型。第2行将加权后的内存压力时间转换为百分比表示，同时通过max函数处理工作时间为零的边缘情况。第3行调用 update\_timestamps 函数实现时间校准机制，处理采样周期偏移问题。第4行应用 exponential\_smoothing 函数实现指数平滑处理，输出最终压力值。
 
 算法\ref{alg:calculate_weighted_pressure_time}实现了多核加权聚合。第3行是该算法的核心，它通过回收时间增量与工作时间增量的乘积累加，实现了公式\ref{eq:weighted_aggregation}中的权重聚合，避免了空闲核心的稀释效应。这种实现方式优于显式维护权重数组的方法，具有更高的计算效率。第4行累加工作时间增量，为后续计算压力百分比提供分母。
 \SetKwFunction{FixedPowerInt}{fixed\_power\_int}

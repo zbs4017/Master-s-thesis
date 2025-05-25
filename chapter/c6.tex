@@ -13,8 +13,9 @@
     \label{tab:hardware_config}
     \begin{tabular}{ll}
         \toprule
-        CPU & Intel(R) Core(TM) i7-8750H @ 2.20GHz \\
+        硬件设备&详细规格\\
         \midrule
+        CPU & Intel(R) Core(TM) i7-8750H @ 2.20GHz \\
         Memory & 16GB (2 \(\times\) 8GB) DDR4 @ 2667MT/s SODIMM \\
         SSD & Intel SSDPEKKW256G8 NVMe SSD (256GB, PCIe Gen3 x4)  \\
         HDD & Seagate ST1000LM035 HDD (1TB, 5400 RPM) \\
@@ -32,13 +33,9 @@
 
 值得注意的是，在 Redis 测试中禁止了持久化功能并关闭了淘汰策略，这样能更直接地暴露内存回收在内核层面的有效性，因为一旦允许用户态自行管理持久化或淘汰，就会在应用层与内核层产生额外耦合，从而干扰对回收策略的评估。
 
-
-
 \section{模块功能与有效性测试}
 
 \subsection{内存压力模块有效性验证}
-
-
 \begin{figure}[htb]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{proc_mem_press.pdf}
@@ -74,7 +71,7 @@
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{swappiness.pdf}
-    \caption{Web Server 在不同  swappiness  下的性能变化}
+    \caption{Web Server 在不同 swappiness 下的性能变化}
     \label{fig:web_server_swappiness}
 \end{figure}
 
@@ -85,7 +82,7 @@
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{redis_swappiness.pdf}
-    \caption{Redis 在不同  swappiness  下的性能变化}
+    \caption{Redis 在不同 swappiness 下的性能变化}
     \label{fig:redis_swappiness}
 \end{figure}
 
@@ -103,7 +100,7 @@
 
 \subsection{测试方案}
 
-实验在Web Server场景下，通过预热阶段将高频访问文件页预加载至内存，随后基于第\ref{sec:pressure_based_model}节所述的内存压力动态控制模型，设置0.01的内存压力阈值以触发主动内存卸载。实验采用渐进式压力注入策略，在维持高并发请求的同时，系统性地评估以下四种配置场景的性能表现：(1) 禁用swap机制；(2) 启用SSD作为swap设备；(3) 启用ZRAM作为swap设备；(4) 在场景(2)和(3)基础上，集成自适应算法（包含内存压力监测模块、文件页与匿名页均衡机制以及基于压力的工作集评估策略）。为量化性能差异，本研究重点监测并分析系统吞吐量（RPS）、内存使用率、缺页中断频率（refault）以及p90响应时间等关键性能指标，通过时序数据变化趋势对系统整体性能进行深入分析。
+实验在Web Server场景下，通过预热阶段将高频访问文件页预加载至内存，随后基于第\ref{sec:pressure_based_model}节所述的内存压力动态控制模型，设置0.01的内存压力阈值以触发主动内存卸载。实验采用渐进式压力注入策略，在维持高并发请求的同时，系统性地评估以下四种配置场景的性能表现：(1) 禁用swap机制；(2) 启用SSD作为swap设备；(3) 启用ZRAM作为swap设备；(4) 在场景(2)和(3)基础上，集成自适应算法（包含内存压力监测模块、文件页与匿名页均衡机制以及基于压力的工作集评估策略）。为量化性能差异，本研究重点监测并分析RPS、内存使用率、缺页中断频率以及p90响应时间等关键性能指标，通过时序数据变化趋势对系统整体性能进行深入分析。
 
 为系统性评估集成算法在纯计算场景中的效能，本研究在 Docker 单机环境中，所选工作负载为 HiBench 基准中的 K-Means 与 PageRank，利用数据生成器构造约 8 GB 输入集；实验仅配置 SSD 作为 swap 卸载后端；对每种算法开关状态执行五轮冷启动（每轮重新创建容器并清空 OS 页缓存），随后在同一冷态下连续运行 15 次 K-Means + PageRank 迭代，从而获得 75 个互相独立的样本以抵消 JVM 预热和文件缓存。核心观测指标包括总运行时间、缺页中断频率以及内存占用。所有指标均以 P90 及其 95 \% 置信区间报告。上述设计通过冷启动 和 重复迭代的方式保证样本独立同分布，保证数据的准确性。对于Baseline，本研究在docker中配置了16GB的内存，并且配置了SSD作为swap设备，并且不开启mp算法，使用Linux自带的换入换成算法。
 
@@ -204,15 +201,15 @@
       \textbf{配置} & \textbf{总运行时间} & \textbf{缺页中断次数} & \textbf{实际内存占用} \\
                    & (min)                & (count)               & (GB)                 \\
       \midrule
-      K-Means + SSD (Baseline) & 180.3 & 34 & 10.6 \\
-      K-Means + SSD + mp 算法         & 189.6 & 12\,920 & 10.4 \\
-      PageRank + SSD (Baseline) & 265.7 & 41 & 10.8 \\
-      PageRank + SSD + mp 算法         & 274.3 & 8\,940 & 10.4 \\
+      K-Means + SSD (Baseline) & 18.3 & 34 & 10.6 \\
+      K-Means + SSD + mp 算法   & 19.6 & 12\,920 & 10.4 \\
+      PageRank + SSD (Baseline) & 26.7 & 41 & 10.8 \\
+      PageRank + SSD + mp 算法  & 27.5 & 8\,940 & 10.4 \\
       \bottomrule
     \end{tabular}
 \end{table}
 
-表 \ref{tab:perf_metrics} 显示，启用 mp 算法后，两类 CPU-bound 负载均出现内存小幅下降、性能轻度回退的一致格局。在 12 GB 的 cgroup 内存上限约束下，K-Means 的常驻集从10.6 GB降低到10.4 GB（降幅约2\%），PageRank 则从 10.8 GB 降低到 10.4 GB（降幅约为4 \%）；与之相伴，二者的 P90 运行时间分别从 180.3 min 上升至 189.6 min（升幅约为5 \%）和从 265.7 min 上升至 274.3 min（升幅约为3 \%），缺页中断次数亦大幅攀升。
+表 \ref{tab:perf_metrics} 显示，启用 mp 算法后，两类 CPU-bound 负载均出现内存小幅下降、性能轻度回退的一致格局。在 12 GB 的 cgroup 内存上限约束下，K-Means 的常驻集从10.6 GB降低到10.4 GB（降幅约2\%），PageRank 则从 10.8 GB 降低到 10.4 GB（降幅约为4 \%）；与之相伴，二者的 P90 运行时间分别从 18.3 min 上升至 19.6 min（升幅约为7 \%）和从 26.7 min 上升至 27.5 min（升幅约为3 \%），缺页中断次数亦大幅攀升。
 
 造成这一现象的根本原因在于负载本身的内存访问策略与 mp 算法的主动卸载策略并不契合。
 

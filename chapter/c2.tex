@@ -11,9 +11,9 @@
     \label{物理内存管理}
 \end{figure}
 
-Linux操作系统采用多层次结构管理物理内存，以实现高效的内存分配和回收。如图\ref{物理内存管理}所示，Linux物理内存管理机制从非统一内存访问架构 （Non-Uniform Memory Access, NUMA）节点、内存区域、伙伴系统、页框管理以及内存探测等多个层面进行组织，形成了一个完整且高效的内存管理体系。分层结构不仅能够满足不同硬件设备和软件应用的需求，还能有效降低内存碎片，提高系统整体性能。
+Linux操作系统采用多层次结构管理物理内存，以实现高效的内存分配和回收。如图\ref{物理内存管理}所示，Linux物理内存管理机制从非统一内存访问架构 （Non-Uniform Memory Access, NUMA）节点、内存区域（之后简称为zone）、伙伴系统、页框管理以及内存探测等多个层面进行组织，形成了一个完整且高效的内存管理体系。分层结构不仅能够满足不同硬件设备和软件应用的需求，还能有效降低内存碎片，提高系统整体性能。
 
-在NUMA架构中，Linux将物理内存划分为多个节点，每个节点由 pg\_data\_t 结构表示。该结构包含多个关键成员，例如 node\_zones[] 用于存储节点内的内存区域，node\_mem\_map 指向该节点的页框描述符数组，而 node\_start\_pfn 则记录了节点的起始页帧号。这种设计使得Linux能够充分利用NUMA架构的特性，优化内存访问性能。每个节点进一步划分为多个内存区域，包括 ZONE\_DMA、ZONE\_DMA32 和 ZONE\_NORMAL。这些区域根据物理地址范围和用途进行划分，例如 ZONE\_DMA 适用于工业标准结构（Industry Standard Architecture, ISA）设备的 DMA 操作，ZONE\_DMA32 适用于只能寻址 32 位内存的设备，而 ZONE\_NORMAL 则用于系统常规内存使用。每个内存区域由 struct zone 结构表示，其中 free\_area[] 用于管理伙伴系统的空闲页框链表，watermark[] 用于控制内存回收的水位线，而 lock 则用于保护并发访问。
+在NUMA架构中，Linux将物理内存划分为多个节点，每个节点由 pg\_data\_t 结构表示。该结构包含多个关键成员，例如 node\_zones[] 用于存储节点内的zone，node\_mem\_map 指向该节点的页框描述符数组，而 node\_start\_pfn 则记录了节点的起始页帧号。这种设计使得Linux能够充分利用NUMA架构的特性，优化内存访问性能。每个节点进一步划分为多个zone，包括 ZONE\_DMA、ZONE\_DMA32 和 ZONE\_NORMAL。这些区域根据物理地址范围和用途进行划分，例如 ZONE\_DMA 适用于工业标准结构（Industry Standard Architecture, ISA）设备的 DMA 操作，ZONE\_DMA32 适用于只能寻址 32 位内存的设备，而 ZONE\_NORMAL 则用于系统常规内存使用。每个zone由 struct zone 结构表示，其中 free\_area[] 用于管理伙伴系统的空闲页框链表，watermark[] 用于控制内存回收的水位线，而 lock 则用于保护并发访问。
 
 伙伴系统是Linux物理内存分配的核心机制，它将连续物理页框组织为大小为\(2^n\)个页的块。从\(2^0\)到\(2^{11}\)的不同阶分别对应1页到2048页的连续内存块。每个阶维护一个空闲块链表，通过 struct free\_area 结构管理。struct free\_area 包含 free\_list[] 用于按迁移类型分类的空闲页链表，以及 nr\_free 用于记录该阶的空闲块数量。为了减少内存碎片，Linux定义了多种内存迁移类型，包括 不可移动页（如内核数据结构）、可移动页（如用户空间应用程序数据）和可回收页（如页缓存、tmpfs等）。伙伴系统中的每个空闲区域列表按迁移类型进一步划分，这使得分配器能够优先从相同迁移类型的页框中分配内存，从而降低内存碎片。
 
@@ -68,7 +68,7 @@ CGroup v2 还增强了各控制器间的协同能力。在 v1 中，由于多层
 \subsection{内存回收机制}
 \label{sec:Linux内存回收机制}
 
-Linux操作系统采用层次化内存管理架构，将物理内存组织为node和zone的二级结构。为实现系统性能与内存使用效率的平衡，Linux实现了一套完善的内存回收机制，本文系统阐述其工作原理与实现细节。
+Linux操作系统采用层次化内存管理架构，将物理内存组织为NUMA node和zone的二级结构。为实现系统性能与内存使用效率的平衡，Linux实现了一套完善的内存回收机制，本文系统阐述其工作原理与实现细节。
 
 \begin{figure}[htb]
     \centering
@@ -182,22 +182,22 @@ Linux内存管理系统通过区分文件页和匿名页实现了精细化的回
 
 \begin{table}[htb]
     \centering
-    \caption{不同存储介质关键性能指标对比}
+    \caption{不同存储介质关键性能指标（近似典型值，最新公开数据换算）}
     \label{tab:storage_comparison}
-    \begin{tabular}{cccc}
-    \toprule
-    指标       & DRAM     & PCM      & 磁盘      \\
-    \midrule
-    读能耗 (J/GB) & 0.8      & 1        & 65       \\
-    写能耗 (J/GB) & 1.2      & 6        & 65       \\
-    闲时能耗 (mW/GB) & 100      & 1        & 10       \\
-    读延迟     & 20-50ns   & 60ns      & 5ms       \\
-    写延迟     & 20-50ns   & 50-120ns  & 5ms       \\
-    密度       & 1x       & 2-4x     & N/A      \\
-    最大擦写次数   & $\infty$ & $10^6$-$10^8$ & $\infty$ \\
-    \bottomrule
+    \begin{tabular}{lccc}
+        \toprule
+        指标 & DRAM (DDR4/5) & PCM (SLC) & 磁盘（7 200 rpm HDD）\\
+        \midrule
+        读能耗 (J/GB) & $\approx0.32$ & $\approx0.02$ & $\approx50$ \\
+        写能耗 (J/GB) & $\approx0.40$ & $\approx0.13$ & $\approx50$ \\
+        闲时能耗 (mW/GB) & 300–400 & $\approx1$ & $\approx10$ \\
+        延迟 & 50–100 ns & 100–350 ns & 2–4 ms \\
+        密度（相对 DRAM） & 1× & 2–4× & N/A \\
+        最大擦写次数 & $\infty$ & $10^{6}$–$10^{8}$ & $\infty$ \\
+        \bottomrule
     \end{tabular}
-    \end{table}
+\end{table}
+
 综上所述，非易失性内存在延迟性能和成本方面具有显著优势，尤其是在与传统存储介质的对比中表现出色。通过利用NVM的高存储密度和低延迟特性，可以显著提升计算机系统的整体性能，同时降低存储成本。这种技术革新为未来存储架构的设计和优化提供了新的方向，尤其是在数据密集型应用和高性能计算领域具有广阔的应用前景。
 
 \subsection{RDMA技术}
@@ -208,7 +208,7 @@ Linux内存管理系统通过区分文件页和匿名页实现了精细化的回
 
 \begin{figure}[htb]
     \centering
-    \includegraphics[width=\textwidth,keepaspectratio]{RDMA.pdf}
+    \includegraphics[width=0.8\textwidth,keepaspectratio]{RDMA.pdf}
     \caption{RDMA 技术架构}
     \label{fig:RDMA}
 \end{figure}
